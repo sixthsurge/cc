@@ -14,6 +14,24 @@
 #undef SLICE_ELEMENT_TYPE
 #undef SLICE_FUNCTION_PREFIX
 
+
+#define SLICE_ELEMENT_TYPE void* 
+#define SLICE_TYPE PtrSlice 
+#define SLICE_FUNCTION_PREFIX ptrslice_
+#include "template/slice.h"
+#undef SLICE_TYPE
+#undef SLICE_ELEMENT_TYPE
+#undef SLICE_FUNCTION_PREFIX
+
+
+#define SLICE_ELEMENT_TYPE usize
+#define SLICE_TYPE UsizeSlice 
+#define SLICE_FUNCTION_PREFIX usizeslice_
+#include "template/slice.h"
+#undef SLICE_TYPE
+#undef SLICE_ELEMENT_TYPE
+#undef SLICE_FUNCTION_PREFIX
+
 //--------------------------------------------------------------------------------
 // Specific helpers
 //--------------------------------------------------------------------------------

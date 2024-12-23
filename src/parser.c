@@ -5,6 +5,7 @@
 #include "ast.h"
 #include "log.h"
 #include "token.h"
+#include "type.h"
 
 AstNode *copy_into_arena(Arena *const arena, AstNode const node) {
     AstNode *const ptr = arena_alloc(arena, sizeof (AstNode));
@@ -35,8 +36,8 @@ void parser_next(Parser *const self) {
     }
 }
 
-bool parser_accept(Parser *const self, TokenType type) {
-    if (parser_peek(self).type == type) {
+bool parser_accept(Parser *const self, TokenKind type) {
+    if (parser_peek(self).kind == type) {
         parser_next(self);
         return true;
     } else {
@@ -44,7 +45,7 @@ bool parser_accept(Parser *const self, TokenType type) {
     }
 }
 
-void parser_expect(Parser *const self, TokenType type) {
+void parser_expect(Parser *const self, TokenKind type) {
     if (!parser_accept(self, type)) {
         parser_error("unexpected token");
     }
@@ -72,8 +73,71 @@ ParseResult failed() {
     };
 }
 
-ParseResult parse_statement(Arena *const ast_arena, Parser *const parser) {
+ParseResult parse_block(Arena *const ast_arena, Parser *const parser) {
+    PtrVec nodes;
+    ptrvec_init(&nodes);
 
+    parser_expect(parser, TokenLeftBrace);
+
+    while (parser_peek(parser).kind != TokenRightBrace) {
+        AstNode const node = require(parse_statement(ast_arena, parser));
+        ptrvec_push(&nodes, (void *) copy_into_arena(ast_arena, node));
+    }
+
+    return ok((AstNode) {
+        .kind = AstNodeBlock,
+        .block = (AstBlock) {
+            .nodes = nodes,
+        },
+    });
+}
+
+ParseResult parse_statement(Arena *const ast_arena, Parser *const parser) {
+    AstNode node;
+
+    // awful
+    if (parser_peek(parser).kind == TokenKeywordInt) {
+        node = require(parse_int_declaration(ast_arena, parser));
+    } else if (parser_peek(parser).kind == TokenKeywordReturn) {
+        node = require(parse_return_statement(ast_arena, parser));
+    } else {
+        node = require(parse_expression(ast_arena, parser));
+    }
+
+    parser_expect(parser, TokenSemicolon);
+    return ok(node);
+}
+
+ParseResult parse_int_declaration(Arena *const ast_arena, Parser *const parser) {
+    // for now, the only supported declarations are `int <identifier> = <expression>`
+    // no other types are supported. you can't even declare without assigning a value
+    // this function is awful
+
+    AstDeclaration declaration;
+
+    parser_expect(parser, TokenKeywordInt);
+    parser_expect(parser, TokenIdentifier);
+    declaration.name = parser->last_token.identifier_name;
+    parser_expect(parser, TokenOperatorAssignment);
+    AstNode const expression = require(parse_expression(ast_arena, parser));
+    declaration.expression = copy_into_arena(ast_arena, expression);
+
+    return ok((AstNode) {
+        .kind = AstNodeDeclaration,
+        .declaration = declaration,
+    });
+}
+
+ParseResult parse_return_statement(Arena *const ast_arena, Parser *const parser) {
+    parser_expect(parser, TokenKeywordReturn);
+    AstNode const expression = require(parse_expression(ast_arena, parser));
+
+    return ok((AstNode) {
+        .kind = AstNodeReturn,
+        .return_statement = (AstReturn) {
+            .expression = copy_into_arena(ast_arena, expression),
+        },
+    });
 }
 
 ParseResult parse_expression(Arena *const ast_arena, Parser *const parser) {
@@ -87,7 +151,7 @@ ParseResult parse_assignment_expression(Arena *const ast_arena, Parser *const pa
         AstNode const right = require(parse_assignment_expression(ast_arena, parser));
 
         return ok((AstNode) {
-            .kind = AstNodeKindAssignment,
+            .kind = AstNodeAssignment,
             .assignment = (AstAssignment) {
                 .left = copy_into_arena(ast_arena, left),
                 .right = copy_into_arena(ast_arena, right),
@@ -105,7 +169,7 @@ ParseResult parse_multiplicative_expression(Arena *ast_arena, Parser *parser) {
         AstNode const right = require(parse_multiplicative_expression(ast_arena, parser));
 
         return ok((AstNode) {
-            .kind = AstNodeKindMultiplication,
+            .kind = AstNodeMultiplication,
             .multiplication = (AstMultiplication) {
                 .left = copy_into_arena(ast_arena, left),
                 .right = copy_into_arena(ast_arena, right),
@@ -115,7 +179,7 @@ ParseResult parse_multiplicative_expression(Arena *ast_arena, Parser *parser) {
         AstNode const right = require(parse_multiplicative_expression(ast_arena, parser));
 
         return ok((AstNode) {
-            .kind = AstNodeKindDivision,
+            .kind = AstNodeDivision,
             .division = (AstDivision) {
                 .left = copy_into_arena(ast_arena, left),
                 .right = copy_into_arena(ast_arena, right),
@@ -133,7 +197,7 @@ ParseResult parse_additive_expression(Arena *const ast_arena, Parser *const pars
         AstNode const right = require(parse_additive_expression(ast_arena, parser));
 
         return ok((AstNode) {
-            .kind = AstNodeKindAddition,
+            .kind = AstNodeAddition,
             .addition = (AstAddition) {
                 .left = copy_into_arena(ast_arena, left),
                 .right = copy_into_arena(ast_arena, right),
@@ -143,7 +207,7 @@ ParseResult parse_additive_expression(Arena *const ast_arena, Parser *const pars
         AstNode const right = require(parse_additive_expression(ast_arena, parser));
 
         return ok((AstNode) {
-            .kind = AstNodeKindSubtraction,
+            .kind = AstNodeSubtraction,
             .subtraction = (AstSubtraction) {
                 .left = copy_into_arena(ast_arena, left),
                 .right = copy_into_arena(ast_arena, right),
@@ -157,14 +221,14 @@ ParseResult parse_additive_expression(Arena *const ast_arena, Parser *const pars
 ParseResult parse_primary_expression(Arena *const ast_arena, Parser *const parser) {
     if (parser_accept(parser, TokenIdentifier)) {
         return ok((AstNode) {
-            .kind = AstNodeKindIdentifier,
+            .kind = AstNodeIdentifier,
             .identifier = (AstIdentifier) {
                 .name = parser->last_token.identifier_name,
             },
         });
     } else if (parser_accept(parser, TokenInteger)) {
         return ok((AstNode) {
-            .kind = AstNodeKindInteger,
+            .kind = AstNodeInteger,
             .integer = (AstInteger) {
                 .value = parser->last_token.integer_value,
             },

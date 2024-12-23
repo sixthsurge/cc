@@ -2,15 +2,18 @@
 // VEC_TYPE            | Name for slice type e.g. CharVec
 // VEC_ELEMENT_TYPE    | Type of slice elements e.g. char
 // VEC_SLICE_TYPE      | Corresponding slice e.g. CharSlice
-// VEC_FUNCTION_PREFIX | VEC_PREFIX for functions on the slice, e.g. charvec_
+// VEC_FUNCTION_PREFIX | Prefix for functions on the slice, e.g. charvec_
+// VEC_DEBUG_FN        | (Optional) function to print an element of the vec
+
+#include "common.h"
 
 #define VEC_CONCAT1(a, b) a##b
 #define VEC_CONCAT2(a, b) VEC_CONCAT1(a, b)
 #define VEC_PREFIX(function) VEC_CONCAT2(VEC_FUNCTION_PREFIX, function)
 
-#include "common.h"
+struct Writer;
 
-typedef struct {
+typedef struct VEC_TYPE {
     usize len;
     usize capacity;
     VEC_ELEMENT_TYPE *data; 
@@ -33,6 +36,10 @@ void              VEC_PREFIX(insert_slice)      (VEC_TYPE *self, usize index, VE
 void              VEC_PREFIX(remove_at)         (VEC_TYPE *self, usize index);
 void              VEC_PREFIX(remove_range)      (VEC_TYPE *self, usize begin, usize end);
 void              VEC_PREFIX(clear)             (VEC_TYPE *self);
+
+#ifdef VEC_DEBUG_FN
+void              VEC_PREFIX(debug)             (struct Writer *writer, VEC_TYPE const *self);
+#endif
 
 #undef VEC_CONCAT1
 #undef VEC_CONCAT2

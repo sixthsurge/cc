@@ -2,32 +2,43 @@
 
 #include <stdio.h>
 #include "slice.h"
+#include "type.h"
+#include "vec.h"
 
 struct AstNode;
+struct Writer;
 
 typedef enum AstNodeKind {
+    AstNodeBlock,
+
+    // Statements 
+    AstNodeDeclaration,
+    AstNodeReturn,
+
+    // Expressions
+    AstNodeAssignment,
+    AstNodeAddition,
+    AstNodeSubtraction,
+    AstNodeMultiplication,
+    AstNodeDivision,
+
     // Terminals
-    AstNodeKindIdentifier,
-    AstNodeKindInteger,
-
-    // Operators
-    AstNodeKindAssignment,
-    AstNodeKindAddition,
-    AstNodeKindSubtraction,
-    AstNodeKindMultiplication,
-    AstNodeKindDivision,
-
-    // Statements
-    AstNodeKindDeclaration,
+    AstNodeIdentifier,
+    AstNodeInteger,
 } AstNodeKind;
 
-typedef struct AstIdentifier {
-    CharSlice name;
-} AstIdentifier;
+typedef struct AstBlock {
+    PtrVec nodes;
+} AstBlock;
 
-typedef struct AstInteger {
-    i32 value;
-} AstInteger;
+typedef struct AstDeclaration {
+    CharSlice name;
+    struct AstNode const *expression;
+} AstDeclaration;
+
+typedef struct AstReturn {
+    struct AstNode const *expression;
+} AstReturn;
 
 typedef struct AstAssignment {
     struct AstNode const *left;
@@ -54,18 +65,29 @@ typedef struct AstDivision {
     struct AstNode const *right;
 } AstDivision;
 
+typedef struct AstIdentifier {
+    CharSlice name;
+} AstIdentifier;
+
+typedef struct AstInteger {
+    i32 value;
+} AstInteger;
+
 typedef struct AstNode {
     AstNodeKind kind;
 
     union {
-        AstIdentifier     identifier;
-        AstInteger        integer;
+        AstBlock          block;
+        AstDeclaration    declaration;
+        AstReturn         return_statement;
         AstAssignment     assignment;
         AstAddition       addition;
         AstSubtraction    subtraction;
         AstMultiplication multiplication;
         AstDivision       division;
+        AstIdentifier     identifier;
+        AstInteger        integer;
     };
 } AstNode;
 
-void ast_debug(FILE *stream, AstNode const *node);
+void ast_debug(struct Writer *writer, AstNode const *node);

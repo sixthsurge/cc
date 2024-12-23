@@ -2,63 +2,92 @@
 
 #include <stdlib.h>
 #include "slice.h"
+#include "writer.h"
 
-
-void ast_debug(FILE *const stream, AstNode const *const node) {
+void ast_debug(struct Writer *writer, AstNode const *const node) {
     switch (node->kind) {
-        case AstNodeKindIdentifier: {
+        case AstNodeBlock: {
+            writer_writef(writer, "Block(");
+            AstBlock const block = node->block;
+
+            for (usize i = 0; i < block.nodes.len; i += 1) {
+                ast_debug(writer, (AstNode *) *ptrvec_at(&block.nodes, i));
+
+                if (i + 1 < block.nodes.len) {
+                    writer_writef(writer, ", ");
+                }
+            }
+
+            writer_writef(writer, ")");
+            break;
+        }
+        case AstNodeDeclaration: {
+            writer_writef(writer, "Declaration(");
+            writer_writef(writer, "name = %s, ", charslice_as_cstr(node->declaration.name));
+            writer_writef(writer, "expression = ");
+            ast_debug(writer, node->declaration.expression);
+            writer_writef(writer, ")");
+            break;
+        }
+        case AstNodeReturn: {
+            writer_writef(writer, "Return(");
+            ast_debug(writer, node->return_statement.expression);
+            writer_writef(writer, ")");
+            break;
+        }
+        case AstNodeIdentifier: {
             char *const name = charslice_as_cstr(node->identifier.name);
-            fprintf(stream, "Identifier(name = %s)", name);
+            writer_writef(writer, "Identifier(%s)", name);
             free(name);
             break;
         }
-        case AstNodeKindInteger: {
-            fprintf(stream, "Integer(value = %d)", node->integer.value);
+        case AstNodeInteger: {
+            writer_writef(writer, "Integer(%d)", node->integer.value);
             break;
         }
-        case AstNodeKindAssignment: {
-            fprintf(stream, "Assignment(");
-            fprintf(stream, "left = ");
-            ast_debug(stream, node->addition.left);
-            fprintf(stream, ", right = ");
-            ast_debug(stream, node->addition.right);
-            fprintf(stream, ")");
+        case AstNodeAssignment: {
+            writer_writef(writer, "Assignment(");
+            writer_writef(writer, "left = ");
+            ast_debug(writer, node->addition.left);
+            writer_writef(writer, ", right = ");
+            ast_debug(writer, node->addition.right);
+            writer_writef(writer, ")");
             break;
         }
-        case AstNodeKindAddition: {
-            fprintf(stream, "Addition(");
-            fprintf(stream, "left = ");
-            ast_debug(stream, node->addition.left);
-            fprintf(stream, ", right = ");
-            ast_debug(stream, node->addition.right);
-            fprintf(stream, ")");
+        case AstNodeAddition: {
+            writer_writef(writer, "Addition(");
+            writer_writef(writer, "left = ");
+            ast_debug(writer, node->addition.left);
+            writer_writef(writer, ", right = ");
+            ast_debug(writer, node->addition.right);
+            writer_writef(writer, ")");
             break;
         }
-        case AstNodeKindSubtraction: {
-            fprintf(stream, "Subtraction(");
-            fprintf(stream, "left = ");
-            ast_debug(stream, node->addition.left);
-            fprintf(stream, ", right = ");
-            ast_debug(stream, node->addition.right);
-            fprintf(stream, ")");
+        case AstNodeSubtraction: {
+            writer_writef(writer, "Subtraction(");
+            writer_writef(writer, "left = ");
+            ast_debug(writer, node->addition.left);
+            writer_writef(writer, ", right = ");
+            ast_debug(writer, node->addition.right);
+            writer_writef(writer, ")");
             break;
         }
-        case AstNodeKindMultiplication: {
-            fprintf(stream, "Multiplication(");
-            fprintf(stream, "left = ");
-            ast_debug(stream, node->addition.left);
-            fprintf(stream, ", right = ");
-            ast_debug(stream, node->addition.right);
-            fprintf(stream, ")");
+        case AstNodeMultiplication: {
+            writer_writef(writer, "Multiplication(");
+            writer_writef(writer, "left = ");
+            ast_debug(writer, node->addition.left);
+            writer_writef(writer, ", right = ");
+            ast_debug(writer, node->addition.right);
+            writer_writef(writer, ")");
             break;
         }
-        case AstNodeKindDivision: {
-            fprintf(stream, "Division(");
-            fprintf(stream, "left = ");
-            ast_debug(stream, node->addition.left);
-            fprintf(stream, ", right = ");
-            ast_debug(stream, node->addition.right);
-            fprintf(stream, ")");
+        case AstNodeDivision: {
+            writer_writef(writer, "Division(");
+            writer_writef(writer, "left = ");
+            ast_debug(writer, node->addition.left);
+            writer_writef(writer, ", right = ");
+            ast_debug(writer, node->addition.right);
+            writer_writef(writer, ")");
             break;
         }
     }

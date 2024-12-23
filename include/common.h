@@ -23,8 +23,13 @@ typedef double   f64;
     #define LIKELY(COND)   __builtin_expect(!!(COND), 1)
     #define UNLIKELY(COND) __builtin_expect(!!(COND), 0)
     #define NORETURN       __attribute__((noreturn))
+
+    #define ATTRIBUTE_PRINTF_LIKE(FORMAT_STRING_INDEX, ARGS_INDEX) __attribute__((__format__ (__printf__, FORMAT_STRING_INDEX, ARGS_INDEX)))
 #else
     #define LIKELY(COND)   COND
     #define UNLIKELY(COND) COND
     #define NORETURN
+
+    #define ATTATTRIBUTE_PRINTF_LIKE(FORMAT_STRING_INDEX, ARGS_INDEX)
 #endif
+

@@ -74,35 +74,35 @@ Token lexer_next_token(Lexer *const self) {
 
     switch (c) {
         case '\0': {
-            token.type = TokenEof;
+            token.kind = TokenEof;
             break;
         }
         case ';': {
-            token.type = TokenSemicolon;
+            token.kind = TokenSemicolon;
             break;
         }
         case '(': {
-            token.type = TokenLeftParen;
+            token.kind = TokenLeftParen;
             break;
         }   
         case ')': {
-            token.type = TokenRightParen;
+            token.kind = TokenRightParen;
             break;
         }   
         case '{': {
-            token.type = TokenLeftBrace;
+            token.kind = TokenLeftBrace;
             break;
         }
         case '}': {
-            token.type = TokenRightBrace;
+            token.kind = TokenRightBrace;
             break;
         }
         case '[': {
-            token.type = TokenLeftBracket;
+            token.kind = TokenLeftBracket;
             break;
         }
         case ']': {
-            token.type = TokenRightBracket;
+            token.kind = TokenRightBracket;
             break;
         }
         case '=': {
@@ -110,28 +110,28 @@ Token lexer_next_token(Lexer *const self) {
 
             if (c_next == '=') {
                 // double = -> equality
-                token.type = TokenOperatorEquality;
+                token.kind = TokenOperatorEquality;
                 lexer_next_char(self);
             } else {
                 // single = -> assignment
-                token.type = TokenOperatorAssignment;
+                token.kind = TokenOperatorAssignment;
             }
             break;
         }
         case '+': {
-            token.type = TokenOperatorAdd;
+            token.kind = TokenOperatorAdd;
             break;
         }
         case '-': {
-            token.type = TokenOperatorSub;
+            token.kind = TokenOperatorSub;
             break;
         }
         case '*': {
-            token.type = TokenOperatorMul;
+            token.kind = TokenOperatorMul;
             break;
         }
         case '/': {
-            token.type = TokenOperatorDiv;
+            token.kind = TokenOperatorDiv;
             break;
         }
         default: {
@@ -140,7 +140,7 @@ Token lexer_next_token(Lexer *const self) {
                 self->character_index -= 1;
                 CharSlice const word = lexer_next_word(self);
 
-                token.type = TokenInteger;
+                token.kind = TokenInteger;
                 token.integer_value = atoi(word.ptr);
             } else if (is_letter_or_underscore(c)) {
                 // word
@@ -148,47 +148,47 @@ Token lexer_next_token(Lexer *const self) {
                 CharSlice const word = lexer_next_word(self);
 
                 if (charslice_eq_cstr(word, "return")) {
-                    token.type = TokenKeywordReturn;
+                    token.kind = TokenKeywordReturn;
                 } else if (charslice_eq_cstr(word, "if")) {
-                    token.type = TokenKeywordIf;
+                    token.kind = TokenKeywordIf;
                 } else if (charslice_eq_cstr(word, "do")) {
-                    token.type = TokenKeywordDo;
+                    token.kind = TokenKeywordDo;
                 } else if (charslice_eq_cstr(word, "while")) {
-                    token.type = TokenKeywordWhile;
+                    token.kind = TokenKeywordWhile;
                 } else if (charslice_eq_cstr(word, "for")) {
-                    token.type = TokenKeywordFor;
+                    token.kind = TokenKeywordFor;
                 } else if (charslice_eq_cstr(word, "switch")) {
-                    token.type = TokenKeywordSwitch;
+                    token.kind = TokenKeywordSwitch;
                 } else if (charslice_eq_cstr(word, "continue")) {
-                    token.type = TokenKeywordContinue;
+                    token.kind = TokenKeywordContinue;
                 } else if (charslice_eq_cstr(word, "break")) {
-                    token.type = TokenKeywordBreak;
+                    token.kind = TokenKeywordBreak;
                 } else if (charslice_eq_cstr(word, "const")) {
-                    token.type = TokenKeywordConst;
+                    token.kind = TokenKeywordConst;
                 } else if (charslice_eq_cstr(word, "void")) {
-                    token.type = TokenKeywordVoid;
+                    token.kind = TokenKeywordVoid;
                 } else if (charslice_eq_cstr(word, "int")) {
-                    token.type = TokenKeywordInt;
+                    token.kind = TokenKeywordInt;
                 } else if (charslice_eq_cstr(word, "signed")) {
-                    token.type = TokenKeywordSigned;
+                    token.kind = TokenKeywordSigned;
                 } else if (charslice_eq_cstr(word, "unsigned")) {
-                    token.type = TokenKeywordUnsigned;
+                    token.kind = TokenKeywordUnsigned;
                 } else if (charslice_eq_cstr(word, "long")) {
-                    token.type = TokenKeywordLong;
+                    token.kind = TokenKeywordLong;
                 } else if (charslice_eq_cstr(word, "short")) {
-                    token.type = TokenKeywordShort;
+                    token.kind = TokenKeywordShort;
                 } else if (charslice_eq_cstr(word, "char")) {
-                    token.type = TokenKeywordChar;
+                    token.kind = TokenKeywordChar;
                 } else if (charslice_eq_cstr(word, "float")) {
-                    token.type = TokenKeywordFloat;
+                    token.kind = TokenKeywordFloat;
                 } else if (charslice_eq_cstr(word, "double")) {
-                    token.type = TokenKeywordDouble;
+                    token.kind = TokenKeywordDouble;
                 } else {
-                    token.type = TokenIdentifier;
+                    token.kind = TokenIdentifier;
                     token.identifier_name = word;
                 }
             } else {
-                token.type = TokenUnknown;
+                token.kind = TokenUnknown;
             }
         }
     }
@@ -208,7 +208,7 @@ TokenVec tokenize(char const *const source_string) {
     do {
         token = lexer_next_token(&lexer);
         tokenvec_push(&tokens, token);
-    } while (token.type != TokenEof);
+    } while (token.kind != TokenEof);
 
     return tokens;
 }

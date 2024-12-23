@@ -172,6 +172,21 @@ void VEC_PREFIX(remove_range)(VEC_TYPE *const self, usize begin, usize end) {
     self->len -= n;
 }
 
+#ifdef VEC_DEBUG_FN
+void VEC_PREFIX(debug)(struct Writer *const writer, VEC_TYPE const *const self) {
+    writer_write(writer, "[");
+    for (usize i = 0; i < self->len; ++i) {
+        VEC_DEBUG_FN(writer, &self->data[i]);
+
+        if (i < self->len - 1) {
+            writer_write(writer, ", ");
+        }
+    }
+    writer_write(writer, "]");
+}
+#endif
+
+
 #undef VEC_CONCAT1
 #undef VEC_CONCAT2
 #undef VEC_PREFIX

@@ -3,15 +3,20 @@
 
 #include "arena.h"
 #include "common.h"
+#include "hash.h"
 #include "lexer.h"
 #include "log.h"
 #include "parser.h"
 #include "read_file_to_string.h"
+#include "slice.h"
 #include "token.h"
+#include "writer.h"
 
 #define ARENA_BLOCK_LEN (1024 * 1024)
 
 i32 main() {
+    Writer stdout_writer = file_writer(stdout);
+
     log_init(
         LOG_LEVEL_TRACE, 
         true,
@@ -21,20 +26,19 @@ i32 main() {
 
     char const *const source = read_file_to_string("examples/test.c");
 
-    // Lexing
+    // Lexical analysis
 
-    log_trace("lexing");
+    log_trace("---- Lexical analysis ----");
 
-    puts("Tokens:");
     TokenVec tokens = tokenize(source);
-    for (usize i = 0u; i < tokens.len; i += 1) {
-        printf("%s ", token_type_debug(tokenvec_at(&tokens, i)->type));
-    }
+
+    puts("Tokens: ");
+    tokenvec_debug(&stdout_writer, &tokens);
     puts("\n");
 
-    // Parsing
+    // Syntax analysis
 
-    log_trace("parsing");
+    log_trace("---- Syntax analysis ----");
 
     Arena ast_arena;
     arena_init(&ast_arena, ARENA_BLOCK_LEN);
@@ -42,16 +46,21 @@ i32 main() {
     Parser parser;
     parser_init(&parser, tokenvec_slice_whole(&tokens));
 
-    ParseResult const result = parse_expression(&ast_arena, &parser);
+    ParseResult const result = parse_block(&ast_arena, &parser);
 
     puts("AST:");
-    ast_debug(stdout, &result.node);
+    ast_debug(&stdout_writer, &result.node);
     puts("\n");
 
-    log_trace("cleaning up");
+    // Semantic analysis
+
+    log_trace("---- Semantic analysis ----");
+
+    // Cleanup
 
     arena_free(&ast_arena);
     tokenvec_free(&tokens);
 
     return 0;
 }
+

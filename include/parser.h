@@ -17,7 +17,10 @@ typedef struct ParseResult {
     bool success;
 } ParseResult;
 
+ParseResult parse_block(Arena *ast_arena, Parser *parser);
 ParseResult parse_statement(Arena *ast_arena, Parser *parser);
+ParseResult parse_int_declaration(Arena *ast_arena, Parser *parser);
+ParseResult parse_return_statement(Arena *ast_arena, Parser *parser);
 ParseResult parse_expression(Arena *ast_arena, Parser *parser);
 ParseResult parse_assignment_expression(Arena *ast_arena, Parser *parser);
 ParseResult parse_additive_expression(Arena *ast_arena, Parser *parser);

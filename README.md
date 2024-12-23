@@ -1,3 +1,9 @@
 # cc
 Making a little C compiler to learn and have fun
-Segfault counter: 1
+
+### References
+- http://www.cse.yorku.ca/~oz/hash.html
+
+### Segfault counter
+
+2 
