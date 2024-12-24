@@ -19,6 +19,13 @@ typedef uint64_t u64;
 typedef float    f32;
 typedef double   f64;
 
+static char const *const color_reset   = "\e[0m";
+static char const *const color_black   = "\e[0;30m";
+static char const *const color_red     = "\e[0;31m";
+static char const *const color_green   = "\e[0;32m";
+static char const *const color_yellow  = "\e[0;33m";
+static char const *const color_magenta = "\e[0;35m";
+
 #ifdef __GNUC__
     #define LIKELY(COND)   __builtin_expect(!!(COND), 1)
     #define UNLIKELY(COND) __builtin_expect(!!(COND), 0)

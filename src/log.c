@@ -7,13 +7,6 @@
 #include <string.h>
 #include <time.h>
 
-#define COLOR_RESET   "\e[0m"
-#define COLOR_BLACK   "\e[0;30m"
-#define COLOR_RED     "\e[0;31m"
-#define COLOR_GREEN   "\e[0;32m"
-#define COLOR_YELLOW  "\e[0;33m"
-#define COLOR_MAGENTA "\e[0;35m"
-
 static struct {
     LogLevel   log_level;
     bool       write_to_stdout;
@@ -29,12 +22,12 @@ static char const *log_level_strings[] = {
     "error",
 };
 
-static char const *log_level_colors[] = {
-    COLOR_RESET,  // disabled
-    COLOR_BLACK,  // trace
-    COLOR_GREEN,  // info
-    COLOR_YELLOW, // warning
-    COLOR_RED,    // error
+static char const *const log_level_colors[] = {
+    color_reset,  // disabled
+    color_black,  // trace
+    color_green,  // info
+    color_yellow, // warning
+    color_red,    // error
 };
 
 static bool log_initialized = false;
@@ -58,7 +51,7 @@ void vlog(
     va_list args
 ) {
     if (UNLIKELY(!log_initialized)) {
-        fprintf(stderr, "%smust call log_init() before using logger functions%s\n", COLOR_RED, COLOR_RESET);
+        fprintf(stderr, "%smust call log_init() before using logger functions%s\n", color_red, color_reset);
         exit(1);
     }
 
@@ -80,12 +73,12 @@ void vlog(
         // print heading
         printf(
             "%s%s%s [%s%s%s] ",
-            COLOR_MAGENTA,
+            color_magenta,
             time_string,
-            COLOR_RESET,
+            color_reset,
             log_level_colors[log_level],
             log_level_strings[log_level],
-            COLOR_RESET
+            color_reset
         );
         // print message
         vprintf(format_string, args);
@@ -98,7 +91,7 @@ void vlog(
         FILE *fp = fopen(log.log_file_path, "a");
 
         if (fp == NULL) {
-            fprintf(stderr, "%sfailed to open log file%s\n", COLOR_RED, COLOR_RESET);
+            fprintf(stderr, "%sfailed to open log file%s\n", color_red, color_reset);
             exit(1);
         }
 

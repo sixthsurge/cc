@@ -1,93 +1,158 @@
 #pragma once
 
-#include <stdio.h>
+#include "common.h"
 #include "slice.h"
-#include "type.h"
-#include "vec.h"
 
-struct AstNode;
 struct Writer;
 
-typedef enum AstNodeKind {
-    AstNodeBlock,
+enum AstUnaryOpKind {
+    AstUnaryOpNegation,
+};
 
-    // Statements 
-    AstNodeDeclaration,
-    AstNodeReturn,
+enum AstBinaryOpKind {
+    AstBinaryOpAssignment,
+    AstBinaryOpAddition,
+    AstBinaryOpSubtraction,
+    AstBinaryOpMultiplication,
+    AstBinaryOpDivision,
+};
 
-    // Expressions
-    AstNodeAssignment,
-    AstNodeAddition,
-    AstNodeSubtraction,
-    AstNodeMultiplication,
-    AstNodeDivision,
+enum AstTypeKind {
+    AstTypeIntS32,
+};
 
-    // Terminals
-    AstNodeIdentifier,
-    AstNodeInteger,
-} AstNodeKind;
+enum AstExpressionKind {
+    AstExpressionIdentifier,
+    AstExpressionConstant,
+    AstExpressionCall,
+    AstExpressionUnaryOp,
+    AstExpressionBinaryOp,
+};
 
-typedef struct AstBlock {
-    PtrVec nodes;
-} AstBlock;
+enum AstStatementKind {
+    AstStatementExpression,
+    AstStatementVariableDeclaration,
+    AstStatementReturn,
+};
 
-typedef struct AstDeclaration {
+enum AstTopLevelItemKind {
+    AstTopLevelItemFunctionDefinition,
+};
+
+struct AstExpression;
+struct AstStatement;
+
+struct AstType {
+    enum AstTypeKind kind;
+};
+
+struct AstIdentifier {
     CharSlice name;
-    struct AstNode const *expression;
-} AstDeclaration;
+};
 
-typedef struct AstReturn {
-    struct AstNode const *expression;
-} AstReturn;
-
-typedef struct AstAssignment {
-    struct AstNode const *left;
-    struct AstNode const *right;
-} AstAssignment;
-
-typedef struct AstAddition {
-    struct AstNode const *left;
-    struct AstNode const *right;
-} AstAddition;
-
-typedef struct AstSubtraction {
-    struct AstNode const *left;
-    struct AstNode const *right;
-} AstSubtraction;
-
-typedef struct AstMultiplication {
-    struct AstNode const *left;
-    struct AstNode const *right;
-} AstMultiplication;
-
-typedef struct AstDivision {
-    struct AstNode const *left;
-    struct AstNode const *right;
-} AstDivision;
-
-typedef struct AstIdentifier {
-    CharSlice name;
-} AstIdentifier;
-
-typedef struct AstInteger {
+struct AstConstant {
     i32 value;
-} AstInteger;
+};
 
-typedef struct AstNode {
-    AstNodeKind kind;
+struct AstCall {
+    struct AstExpression const *callee;
+    struct AstExpression const *arguments;
+    usize argument_count;
+}; 
+
+struct AstUnaryOp {
+    enum AstUnaryOpKind kind;
+    struct AstExpression const *expression;
+};
+
+struct AstBinaryOp {
+    enum AstBinaryOpKind kind;
+    struct AstExpression const *left;
+    struct AstExpression const *right;
+};
+
+struct AstExpression {
+    enum AstExpressionKind kind;
 
     union {
-        AstBlock          block;
-        AstDeclaration    declaration;
-        AstReturn         return_statement;
-        AstAssignment     assignment;
-        AstAddition       addition;
-        AstSubtraction    subtraction;
-        AstMultiplication multiplication;
-        AstDivision       division;
-        AstIdentifier     identifier;
-        AstInteger        integer;
+        struct AstIdentifier identifier;
+        struct AstConstant constant;
+        struct AstCall call;
+        struct AstUnaryOp unary_op;
+        struct AstBinaryOp binary_op;
     };
-} AstNode;
+};
 
-void ast_debug(struct Writer *writer, AstNode const *node);
+struct AstVariableDeclaration {
+    struct AstIdentifier identifier;
+    struct AstType type;
+    struct AstExpression assigned_expression;
+    bool has_assigned_expression;
+};
+
+struct AstReturn {
+    struct AstExpression expression;
+};
+
+struct AstStatement {
+    enum AstStatementKind kind;
+
+    union {
+        struct AstExpression expression;
+        struct AstVariableDeclaration variable_declaration;
+        struct AstReturn return_statement;
+    };
+};
+
+struct AstBlock {
+    struct AstStatement const *statements;
+    usize statement_count;
+};
+
+struct AstFunctionParameter {
+    struct AstIdentifier identifier;
+    struct AstType type;
+};
+
+struct AstFunctionSignature {
+    struct AstIdentifier identifier;
+    struct AstType return_type;
+    struct AstFunctionParameter *parameters;
+    usize parameter_count;
+};
+
+struct AstFunctionDefinition {
+    struct AstFunctionSignature signature;
+    struct AstBlock body;
+};
+
+struct AstTopLevelItem {
+    enum AstTopLevelItemKind kind;
+
+    union {
+        struct AstFunctionDefinition function_definition;
+    };
+};
+
+struct AstRoot {
+    struct AstTopLevelItem const *items;
+    usize item_count;
+};
+
+void ast_debug_root(struct Writer *writer, struct AstRoot const *self);
+void ast_debug_top_level_item(struct Writer *writer, struct AstTopLevelItem const *self);
+void ast_debug_function_definition(struct Writer *writer, struct AstFunctionDefinition const *self);
+void ast_debug_function_signature(struct Writer *writer, struct AstFunctionSignature const *self);
+void ast_debug_function_parameter(struct Writer *writer, struct AstFunctionParameter const *parameter);
+void ast_debug_block(struct Writer *writer, struct AstBlock const *self);
+void ast_debug_statement(struct Writer *writer, struct AstStatement const *self);
+void ast_debug_variable_declaration(struct Writer *writer, struct AstVariableDeclaration const *self);
+void ast_debug_return(struct Writer *writer, struct AstReturn const *self);
+void ast_debug_expression(struct Writer *writer, struct AstExpression const *self);
+void ast_debug_unary_op(struct Writer *writer, struct AstUnaryOp const *self);
+void ast_debug_binary_op(struct Writer *writer, struct AstBinaryOp const *self);
+void ast_debug_call(struct Writer *writer, struct AstCall const *self);
+void ast_debug_constant(struct Writer *writer, struct AstConstant const *self);
+void ast_debug_identifier(struct Writer *writer, struct AstIdentifier const *self);
+void ast_debug_type(struct Writer *writer, struct AstType const *self);
+

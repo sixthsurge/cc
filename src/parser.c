@@ -5,38 +5,31 @@
 #include "ast.h"
 #include "log.h"
 #include "token.h"
-#include "type.h"
+#include "writer.h"
 
-AstNode *copy_into_arena(Arena *const arena, AstNode const node) {
-    AstNode *const ptr = arena_alloc(arena, sizeof (AstNode));
-    *ptr = node;
-    return ptr;
-}
+typedef struct ParseResult (*ExpressionParser)(struct AstExpression *, struct Parser *);
 
-NORETURN void parser_error(char const *const message) {
-    log_info("parser error: %s", message);
-    exit(1);
-}
-
-void parser_init(Parser *const self, TokenSlice const tokens) {
+void parser_init(struct Parser *const self, Arena *const ast_arena, TokenSlice const tokens) {
     self->tokens = tokens;
+    self->ast_arena = ast_arena;
 }
 
-Token parser_peek(Parser *const self) {
+static Token parser_peek(struct Parser const *const self) {
     return self->tokens.ptr[0];
 }
 
-void parser_next(Parser *const self) {
+static bool parser_next(struct Parser *const self) {
     if (self->tokens.len > 0) {
         self->last_token = parser_peek(self);
         self->tokens.ptr++;
         self->tokens.len--;
+        return true;
     } else {
-        parser_error("expected another token");
+        return false;
     }
 }
 
-bool parser_accept(Parser *const self, TokenKind type) {
+static bool parser_accept(struct Parser *const self, TokenKind type) {
     if (parser_peek(self).kind == type) {
         parser_next(self);
         return true;
@@ -45,201 +38,265 @@ bool parser_accept(Parser *const self, TokenKind type) {
     }
 }
 
-void parser_expect(Parser *const self, TokenKind type) {
-    if (!parser_accept(self, type)) {
-        parser_error("unexpected token");
-    }
-}
-
-AstNode require(ParseResult result) {
-    if (result.success) {
-        return result.node;
-    } else {
-        parser_error("error");
-    }
-}
-
-ParseResult ok(AstNode node) {
-    return (ParseResult) {
-        .node = node,
-        .success = true,
+static struct ParseError parser_expected_tokens(
+    struct Parser const *const self,
+    TokenKind const *expected,
+    usize expected_count
+) {
+    return (struct ParseError) {
+        .kind = ParseErrorUnexpectedToken,
+        .position = parser_peek(self).position,
+        .unexpected_token = {
+            .found = parser_peek(self).kind,
+            .expected = arena_copy(self->ast_arena, expected, sizeof (TokenKind) * expected_count),
+            .expected_count = expected_count,
+        },
     };
 }
 
-ParseResult failed() {
-    return (ParseResult) {
-        .node = {},
-        .success = false,
+static struct ParseError parser_expected_token(
+    struct Parser const *const self,
+    TokenKind const expected
+) {
+    return parser_expected_tokens(self, &expected, 1u);
+}
+
+static struct ParseResult parse_ok() {
+    return (struct ParseResult) {
+        .ok = true,
     };
 }
 
-ParseResult parse_block(Arena *const ast_arena, Parser *const parser) {
-    PtrVec nodes;
-    ptrvec_init(&nodes);
+static struct ParseResult parse_error(struct ParseError error) {
+    return (struct ParseResult) {
+        .ok = false,
+        .error = error,
+    };
+}
 
-    parser_expect(parser, TokenLeftBrace);
+#define PARSER_REQUIRE(RESULT) \
+    if (!result.ok) {          \
+        return result;         \
+    }
+
+#define PARSER_EXPECT(PARSER, EXPECTED_TOKEN)                                \
+    if (!parser_accept(PARSER, EXPECTED_TOKEN)) {                            \
+        return parse_error(parser_expected_token(PARSER, EXPECTED_TOKEN)); \
+    }
+
+static struct ParseResult parse_binary_operation(
+    struct AstExpression *const out,
+    struct Parser *const parser,
+    usize op_count,
+    enum AstBinaryOpKind const *ops,
+    TokenKind const *tokens,
+    ExpressionParser const same_precedence,
+    ExpressionParser const next_precedence
+) {
+    struct AstExpression left;
+    struct ParseResult const result = next_precedence(&left, parser);
+    PARSER_REQUIRE(result);
+
+    for (usize op_index = 0; op_index < op_count; op_index += 1) {
+        if (parser_accept(parser, tokens[op_index])) {
+            struct AstExpression right;
+            struct ParseResult const result = same_precedence(&right, parser);
+            PARSER_REQUIRE(result);
+
+            *out = (struct AstExpression) {
+                .kind = AstExpressionBinaryOp,
+                .binary_op = (struct AstBinaryOp) {
+                    .kind = ops[op_index],
+                    .left = arena_copy(parser->ast_arena, &left, sizeof left),
+                    .right = arena_copy(parser->ast_arena, &right, sizeof right),
+                },
+            };
+
+            return parse_ok();
+        }       
+    }
+
+    *out = left;
+    return parse_ok();
+}
+
+struct ParseResult parse_block(struct AstBlock *const out, struct Parser *const parser) {
+    PARSER_EXPECT(parser, TokenLeftBrace);
+
+    struct ArenaVec statements;
+    arenavec_init(&statements, parser->ast_arena, sizeof (struct AstStatement));
 
     while (parser_peek(parser).kind != TokenRightBrace) {
-        AstNode const node = require(parse_statement(ast_arena, parser));
-        ptrvec_push(&nodes, (void *) copy_into_arena(ast_arena, node));
+        struct AstStatement statement;
+        struct ParseResult const statement_result = parse_statement(&statement, parser);
+
+        if (!statement_result.ok) {
+            return statement_result;
+        }
+
+        arenavec_push(&statements, (void *) &statement);
     }
 
-    return ok((AstNode) {
-        .kind = AstNodeBlock,
-        .block = (AstBlock) {
-            .nodes = nodes,
-        },
-    });
+    out->statements = statements.data;
+    out->statement_count = statements.len;
+
+    return parse_ok();
 }
 
-ParseResult parse_statement(Arena *const ast_arena, Parser *const parser) {
-    AstNode node;
+struct ParseResult parse_statement(struct AstStatement *const out, struct Parser *const parser) {
+    struct ParseResult result;
 
-    // awful
-    if (parser_peek(parser).kind == TokenKeywordInt) {
-        node = require(parse_int_declaration(ast_arena, parser));
-    } else if (parser_peek(parser).kind == TokenKeywordReturn) {
-        node = require(parse_return_statement(ast_arena, parser));
-    } else {
-        node = require(parse_expression(ast_arena, parser));
+    result = parse_return(&out->return_statement, parser);
+    if (result.ok) {
+        out->kind = AstStatementReturn;
+        goto Ok;
     }
 
-    parser_expect(parser, TokenSemicolon);
-    return ok(node);
+    result = parse_variable_declaration(&out->variable_declaration, parser);
+    if (result.ok) {
+        out->kind = AstStatementVariableDeclaration;
+        goto Ok;
+    }
+
+    result = parse_expression(&out->expression, parser);
+    if (result.ok) {
+        out->kind = AstStatementExpression;
+        goto Ok;
+    }
+
+    return result;
+
+Ok:
+    PARSER_EXPECT(parser, TokenSemicolon);
+
+    return parse_ok();
 }
 
-ParseResult parse_int_declaration(Arena *const ast_arena, Parser *const parser) {
-    // for now, the only supported declarations are `int <identifier> = <expression>`
-    // no other types are supported. you can't even declare without assigning a value
-    // this function is awful
-
-    AstDeclaration declaration;
-
-    parser_expect(parser, TokenKeywordInt);
-    parser_expect(parser, TokenIdentifier);
-    declaration.name = parser->last_token.identifier_name;
-    parser_expect(parser, TokenOperatorAssignment);
-    AstNode const expression = require(parse_expression(ast_arena, parser));
-    declaration.expression = copy_into_arena(ast_arena, expression);
-
-    return ok((AstNode) {
-        .kind = AstNodeDeclaration,
-        .declaration = declaration,
-    });
-}
-
-ParseResult parse_return_statement(Arena *const ast_arena, Parser *const parser) {
-    parser_expect(parser, TokenKeywordReturn);
-    AstNode const expression = require(parse_expression(ast_arena, parser));
-
-    return ok((AstNode) {
-        .kind = AstNodeReturn,
-        .return_statement = (AstReturn) {
-            .expression = copy_into_arena(ast_arena, expression),
-        },
-    });
-}
-
-ParseResult parse_expression(Arena *const ast_arena, Parser *const parser) {
-    return parse_assignment_expression(ast_arena, parser);
-}
-
-ParseResult parse_assignment_expression(Arena *const ast_arena, Parser *const parser) {
-    AstNode const left = require(parse_additive_expression(ast_arena, parser));
+struct ParseResult parse_variable_declaration(
+    struct AstVariableDeclaration *const out, 
+    struct Parser *const parser
+) {
+    PARSER_EXPECT(parser, TokenKeywordInt);
+    PARSER_EXPECT(parser, TokenIdentifier);
+    out->identifier.name = parser->last_token.identifier_name;
 
     if (parser_accept(parser, TokenOperatorAssignment)) {
-        AstNode const right = require(parse_assignment_expression(ast_arena, parser));
+        struct ParseResult const result = parse_expression(&out->assigned_expression, parser);
+        PARSER_REQUIRE(result);
+    } 
 
-        return ok((AstNode) {
-            .kind = AstNodeAssignment,
-            .assignment = (AstAssignment) {
-                .left = copy_into_arena(ast_arena, left),
-                .right = copy_into_arena(ast_arena, right),
-            }
-        });
-    } else {
-        return ok(left);
-    }
+    return parse_ok();
 }
 
-ParseResult parse_multiplicative_expression(Arena *ast_arena, Parser *parser) {
-    AstNode const left = require(parse_primary_expression(ast_arena, parser));
-
-    if (parser_accept(parser, TokenOperatorMul)) {
-        AstNode const right = require(parse_multiplicative_expression(ast_arena, parser));
-
-        return ok((AstNode) {
-            .kind = AstNodeMultiplication,
-            .multiplication = (AstMultiplication) {
-                .left = copy_into_arena(ast_arena, left),
-                .right = copy_into_arena(ast_arena, right),
-            }
-        });
-    } else if (parser_accept(parser, TokenOperatorDiv)) {
-        AstNode const right = require(parse_multiplicative_expression(ast_arena, parser));
-
-        return ok((AstNode) {
-            .kind = AstNodeDivision,
-            .division = (AstDivision) {
-                .left = copy_into_arena(ast_arena, left),
-                .right = copy_into_arena(ast_arena, right),
-            }
-        });
-    } else {
-        return ok(left);
-    }
+struct ParseResult parse_return(struct AstReturn *const out, struct Parser *const parser) {
+    PARSER_EXPECT(parser, TokenKeywordReturn);
+    return parse_expression(&out->expression, parser);
 }
 
-ParseResult parse_additive_expression(Arena *const ast_arena, Parser *const parser) {
-    AstNode left = require(parse_multiplicative_expression(ast_arena, parser));
-
-    if (parser_accept(parser, TokenOperatorAdd)) {
-        AstNode const right = require(parse_additive_expression(ast_arena, parser));
-
-        return ok((AstNode) {
-            .kind = AstNodeAddition,
-            .addition = (AstAddition) {
-                .left = copy_into_arena(ast_arena, left),
-                .right = copy_into_arena(ast_arena, right),
-            }
-        });
-    } else if (parser_accept(parser, TokenOperatorSub)) {
-        AstNode const right = require(parse_additive_expression(ast_arena, parser));
-
-        return ok((AstNode) {
-            .kind = AstNodeSubtraction,
-            .subtraction = (AstSubtraction) {
-                .left = copy_into_arena(ast_arena, left),
-                .right = copy_into_arena(ast_arena, right),
-            }
-        });
-    } else {
-        return ok(left);
-    }
+struct ParseResult parse_expression(struct AstExpression *const out, struct Parser *const parser) {
+    return parse_assignment_expression(out, parser);
 }
 
-ParseResult parse_primary_expression(Arena *const ast_arena, Parser *const parser) {
-    if (parser_accept(parser, TokenIdentifier)) {
-        return ok((AstNode) {
-            .kind = AstNodeIdentifier,
-            .identifier = (AstIdentifier) {
-                .name = parser->last_token.identifier_name,
-            },
-        });
-    } else if (parser_accept(parser, TokenInteger)) {
-        return ok((AstNode) {
-            .kind = AstNodeInteger,
-            .integer = (AstInteger) {
-                .value = parser->last_token.integer_value,
-            },
-        });
-    } else if (parser_accept(parser, TokenLeftParen)) {
-        AstNode const expression = require(parse_expression(ast_arena, parser));
-        parser_expect(parser, TokenRightParen);
+struct ParseResult parse_assignment_expression(struct AstExpression *const out, struct Parser *const parser) {
+    enum AstBinaryOpKind const ops[] = { AstBinaryOpAssignment };
+    TokenKind const tokens[] = { TokenOperatorAssignment };
 
-        return ok(expression);
-    } else {
-        return failed();
+    return parse_binary_operation(
+        out, 
+        parser, 
+        1,
+        ops, 
+        tokens, 
+        parse_assignment_expression, 
+        parse_additive_expression
+    );
+}
+
+struct ParseResult parse_additive_expression(struct AstExpression *const out, struct Parser *const parser) {
+    enum AstBinaryOpKind const ops[] = { AstBinaryOpAddition, AstBinaryOpSubtraction };
+    TokenKind const tokens[] = { TokenOperatorAdd, TokenOperatorSub };
+
+    return parse_binary_operation(
+        out, 
+        parser, 
+        2,
+        ops, 
+        tokens, 
+        parse_additive_expression, 
+        parse_multiplicative_expression
+    );
+}
+
+struct ParseResult parse_multiplicative_expression(struct AstExpression *const out, struct Parser *const parser) {
+    enum AstBinaryOpKind const ops[] = { AstBinaryOpMultiplication, AstBinaryOpDivision };
+    TokenKind const tokens[] = { TokenOperatorMul, TokenOperatorDiv };
+
+    return parse_binary_operation(
+        out, 
+        parser, 
+        2,
+        ops, 
+        tokens, 
+        parse_multiplicative_expression, 
+        parse_primary_expression
+    );
+}
+
+struct ParseResult parse_primary_expression(struct AstExpression *const out, struct Parser *const parser) {
+    switch (parser_peek(parser).kind) {
+        case TokenIdentifier: {
+            parser_next(parser);
+            out->kind = AstExpressionIdentifier;
+            out->identifier.name = parser->last_token.identifier_name;
+            return parse_ok();
+        }
+        case TokenInteger: {
+            parser_next(parser);
+            out->kind = AstExpressionConstant;
+            out->constant.value = parser->last_token.integer_value;
+            return parse_ok();
+        }
+        case TokenLeftParen: {
+            parser_next(parser);
+            struct ParseResult result = parse_expression(out, parser);
+            PARSER_REQUIRE(result);
+            PARSER_EXPECT(parser, TokenRightParen);
+            return parse_ok();
+        }
+        default: {
+            TokenKind const expected[] = { TokenIdentifier, TokenInteger, TokenLeftParen };
+            return parse_error(parser_expected_tokens(parser, expected, 3));
+        }
     }
 }    
+
+void parse_error_debug(struct Writer *writer, struct ParseError const *error) {
+    switch (error->kind) {
+        case ParseErrorUnexpectedToken: {
+            writer_write(writer, "unexpected token: expected ");
+
+            for (usize i = 0u; i < error->unexpected_token.expected_count; i += 1u) {
+                writer_write(writer, color_magenta);
+                token_kind_debug(writer, &error->unexpected_token.expected[i]);
+                writer_write(writer, color_reset);
+
+                if (i < error->unexpected_token.expected_count - 1u) {
+                    writer_write(writer, " or ");
+                }
+            }
+
+            writer_write(writer, ", found ");
+            writer_write(writer, color_magenta);
+            token_kind_debug(writer, &error->unexpected_token.found);
+            writer_write(writer, color_reset);
+            writer_write(writer, ".");
+
+            break;
+        }
+        case ParseErrorExpectedPrimaryExpression: {
+            writer_write(writer, "expected primary expression.");
+            break;
+        }
+    }
+}
 

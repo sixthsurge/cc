@@ -4,92 +4,229 @@
 #include "slice.h"
 #include "writer.h"
 
-void ast_debug(struct Writer *writer, AstNode const *const node) {
-    switch (node->kind) {
-        case AstNodeBlock: {
-            writer_writef(writer, "Block(");
-            AstBlock const block = node->block;
+void ast_debug_root(struct Writer *writer, struct AstRoot const *self) {
+    writer_write(writer, "Root(items = [");
+    for (usize i = 0; i < self->item_count; ++i) {
+        ast_debug_top_level_item(writer, &self->items[i]);
 
-            for (usize i = 0; i < block.nodes.len; i += 1) {
-                ast_debug(writer, (AstNode *) *ptrvec_at(&block.nodes, i));
+        if (i < self->item_count - 1) {
+            writer_write(writer, ", ");
+        }
+    }
+    writer_write(writer, "])");
+}
 
-                if (i + 1 < block.nodes.len) {
-                    writer_writef(writer, ", ");
-                }
-            }
+void ast_debug_top_level_item(struct Writer *writer, struct AstTopLevelItem const *self) {
+    switch (self->kind) {
+        case AstTopLevelItemFunctionDefinition: {
+            ast_debug_function_definition(writer, &self->function_definition);
+            break;
+        }       
+    }
+}
 
-            writer_writef(writer, ")");
+void ast_debug_function_definition(struct Writer *writer, struct AstFunctionDefinition const *self) {
+    writer_write(writer, "FunctionDefinition(");
+
+    writer_write(writer, "signature = ");
+    ast_debug_function_signature(writer, &self->signature);
+    
+    writer_write(writer, ", body = ");
+    ast_debug_block(writer, &self->body);
+
+    writer_write(writer, ")");
+}
+
+void ast_debug_function_signature(struct Writer *writer, struct AstFunctionSignature const *self) {
+    writer_write(writer, "FunctionSignature(");
+
+    writer_write(writer, "identifier = ");
+    ast_debug_identifier(writer, &self->identifier);
+
+    writer_write(writer, ", return_type = ");
+    ast_debug_type(writer, &self->return_type);
+
+    writer_write(writer, ", arguments = [");
+    for (usize i = 0; i < self->parameter_count; ++i) {
+        ast_debug_function_parameter(writer, &self->parameters[i]);
+
+        if (i < self->parameter_count - 1) {
+            writer_write(writer, ", ");
+        }
+    }
+
+    writer_write(writer, "])");
+}
+
+void ast_debug_function_parameter(struct Writer *writer, struct AstFunctionParameter const *self) {
+    writer_write(writer, "FunctionParameter(");
+
+    writer_write(writer, "identifier = ");
+    ast_debug_identifier(writer, &self->identifier);
+
+    writer_write(writer, ", type = ");
+    ast_debug_type(writer, &self->type);
+
+    writer_write(writer, "])");
+}
+
+void ast_debug_block(struct Writer *writer, struct AstBlock const *self) {
+    writer_write(writer, "Block(statements = [");
+    for (usize i = 0; i < self->statement_count; ++i) {
+        ast_debug_statement(writer, &self->statements[i]);
+
+        if (i < self->statement_count - 1) {
+            writer_write(writer, ", ");
+        }
+    }
+    writer_write(writer, "])");
+}
+
+void ast_debug_statement(struct Writer *writer, struct AstStatement const *self) {
+    switch (self->kind) {
+        case AstStatementExpression: {
+            ast_debug_expression(writer, &self->expression);
             break;
         }
-        case AstNodeDeclaration: {
-            writer_writef(writer, "Declaration(");
-            writer_writef(writer, "name = %s, ", charslice_as_cstr(node->declaration.name));
-            writer_writef(writer, "expression = ");
-            ast_debug(writer, node->declaration.expression);
-            writer_writef(writer, ")");
+        case AstStatementVariableDeclaration: {
+            ast_debug_variable_declaration(writer, &self->variable_declaration);
             break;
         }
-        case AstNodeReturn: {
-            writer_writef(writer, "Return(");
-            ast_debug(writer, node->return_statement.expression);
-            writer_writef(writer, ")");
-            break;
-        }
-        case AstNodeIdentifier: {
-            char *const name = charslice_as_cstr(node->identifier.name);
-            writer_writef(writer, "Identifier(%s)", name);
-            free(name);
-            break;
-        }
-        case AstNodeInteger: {
-            writer_writef(writer, "Integer(%d)", node->integer.value);
-            break;
-        }
-        case AstNodeAssignment: {
-            writer_writef(writer, "Assignment(");
-            writer_writef(writer, "left = ");
-            ast_debug(writer, node->addition.left);
-            writer_writef(writer, ", right = ");
-            ast_debug(writer, node->addition.right);
-            writer_writef(writer, ")");
-            break;
-        }
-        case AstNodeAddition: {
-            writer_writef(writer, "Addition(");
-            writer_writef(writer, "left = ");
-            ast_debug(writer, node->addition.left);
-            writer_writef(writer, ", right = ");
-            ast_debug(writer, node->addition.right);
-            writer_writef(writer, ")");
-            break;
-        }
-        case AstNodeSubtraction: {
-            writer_writef(writer, "Subtraction(");
-            writer_writef(writer, "left = ");
-            ast_debug(writer, node->addition.left);
-            writer_writef(writer, ", right = ");
-            ast_debug(writer, node->addition.right);
-            writer_writef(writer, ")");
-            break;
-        }
-        case AstNodeMultiplication: {
-            writer_writef(writer, "Multiplication(");
-            writer_writef(writer, "left = ");
-            ast_debug(writer, node->addition.left);
-            writer_writef(writer, ", right = ");
-            ast_debug(writer, node->addition.right);
-            writer_writef(writer, ")");
-            break;
-        }
-        case AstNodeDivision: {
-            writer_writef(writer, "Division(");
-            writer_writef(writer, "left = ");
-            ast_debug(writer, node->addition.left);
-            writer_writef(writer, ", right = ");
-            ast_debug(writer, node->addition.right);
-            writer_writef(writer, ")");
+        case AstStatementReturn: {
+            ast_debug_return(writer, &self->return_statement);
             break;
         }
     }
 }
 
+void ast_debug_variable_declaration(struct Writer *writer, struct AstVariableDeclaration const *self) {
+    writer_write(writer, "VariableDeclaration(");
+
+    writer_write(writer, "identifier = ");
+    ast_debug_identifier(writer, &self->identifier);
+
+    writer_write(writer, ", type = ");
+    ast_debug_type(writer, &self->type);
+
+    if (self->has_assigned_expression) {
+        writer_write(writer, ", assigned_expression = ");
+        ast_debug_expression(writer, &self->assigned_expression);
+    }
+
+    writer_write(writer, ")");
+}
+
+void ast_debug_return(struct Writer *writer, struct AstReturn const *self) {
+    writer_write(writer, "Return(expression = ");
+    ast_debug_expression(writer, &self->expression);
+    writer_write(writer, ")");
+}
+
+void ast_debug_expression(struct Writer *writer, struct AstExpression const *self) {
+    switch (self->kind) {
+        case AstExpressionIdentifier: {
+            ast_debug_identifier(writer, &self->identifier);
+            break;
+        }
+        case AstExpressionConstant: {
+            ast_debug_constant(writer, &self->constant);
+            break;
+        }
+        case AstExpressionCall: {
+            ast_debug_call(writer, &self->call);
+            break;
+        }
+        case AstExpressionUnaryOp: {
+            ast_debug_unary_op(writer, &self->unary_op);
+            break;
+        }
+        case AstExpressionBinaryOp: {
+            ast_debug_binary_op(writer, &self->binary_op);
+            break;
+        }
+    }
+}
+
+void ast_debug_unary_op(struct Writer *writer, struct AstUnaryOp const *self) {
+    writer_write(writer, "UnaryOp(");
+
+    writer_write(writer, "kind = ");
+    switch (self->kind) {
+        case AstUnaryOpNegation: { 
+            writer_write(writer, "Negation");
+            break;
+        }
+    }
+
+    writer_write(writer, ", expression = ");
+    ast_debug_expression(writer, self->expression);
+    
+    writer_write(writer, ")");
+}
+
+void ast_debug_binary_op(struct Writer *writer, struct AstBinaryOp const *self) {
+    writer_write(writer, "BinaryOp(");
+
+    writer_write(writer, "kind = ");
+    switch (self->kind) {
+        case AstBinaryOpAssignment: { 
+            writer_write(writer, "Assignment");
+            break;
+        }
+        case AstBinaryOpAddition: { 
+            writer_write(writer, "Addition");
+            break;
+        }
+        case AstBinaryOpSubtraction: { 
+            writer_write(writer, "Subtraction");
+            break;
+        }
+        case AstBinaryOpMultiplication: { 
+            writer_write(writer, "Multiplication");
+            break;
+        }
+        case AstBinaryOpDivision: { 
+            writer_write(writer, "Division");
+            break;
+        }
+    }
+
+    writer_write(writer, ", left = ");
+    ast_debug_expression(writer, self->left);
+
+    writer_write(writer, ", right = ");
+    ast_debug_expression(writer, self->right);
+    
+    writer_write(writer, ")");
+}
+
+void ast_debug_call(struct Writer *writer, struct AstCall const *self) {
+    writer_write(writer, "Call(");
+
+    writer_write(writer, "callee = ");
+    ast_debug_expression(writer, self->callee);
+
+    writer_write(writer, "arguments = [");
+    for (usize i = 0; i < self->argument_count; ++i) {
+        ast_debug_expression(writer, &self->arguments[i]);
+
+        if (i < self->argument_count - 1) {
+            writer_write(writer, ", ");
+        }
+    }
+    writer_write(writer, "])");
+}
+
+void ast_debug_constant(struct Writer *writer, struct AstConstant const *self) {
+    writer_writef(writer, "Constant(value = %d)", self->value);
+}
+
+void ast_debug_identifier(struct Writer *writer, struct AstIdentifier const *self) {
+    writer_write(writer, "Identifier(name = ");
+    writer_write_charslice(writer, self->name);
+    writer_write(writer, ")");
+}
+
+void ast_debug_type(struct Writer *writer, struct AstType const *self) {
+    writer_write(writer, "int");
+}

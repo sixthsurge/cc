@@ -1,6 +1,7 @@
 #include "arena.h"
 
 #include <stdlib.h>
+#include <string.h>
 #include "log.h"
 
 typedef struct ArenaBlock {
@@ -9,19 +10,19 @@ typedef struct ArenaBlock {
     usize total;
 } ArenaBlock;
 
-void arena_block_init(ArenaBlock *const self, usize const len) {
+static void arena_block_init(ArenaBlock *const self, usize const len) {
     self->ptr = malloc(len);
     self->used = 0u;
     self->total = len;
 }
 
-void arena_block_free(ArenaBlock *const self) {
+static void arena_block_free(ArenaBlock *const self) {
     free(self->ptr);
 }
 
 // If the block can accommodate `len` more bytes, allocates that in the block and returns 
 // the address. Otherwise returns NULL
-void *arena_block_try_alloc(ArenaBlock *const self, usize const len) {
+static void *arena_block_try_alloc(ArenaBlock *const self, usize const len) {
     if (self->used + len < self->total) {
         void *address = self->ptr + self->used;
         self->used += len;
@@ -31,7 +32,7 @@ void *arena_block_try_alloc(ArenaBlock *const self, usize const len) {
     }
 }
 
-ArenaBlock *arena_add_block(Arena *const self) {
+static ArenaBlock *arena_add_block(Arena *const self) {
     self->block_count += 1;
     self->blocks = realloc(self->blocks, self->block_count);
 
@@ -70,6 +71,12 @@ void *arena_alloc(Arena *const self, usize const len) {
     return arena_block_try_alloc(new_block, len);
 }
 
+void *arena_copy(Arena *self, void const *item, usize item_size) {
+    void *const ptr = arena_alloc(self, item_size);
+    memcpy(ptr, item, item_size);
+    return ptr;
+}
+
 void arena_clear(Arena *const self) {
     for (usize i = 0u; i < self->block_count; i += 1) {
         arena_block_free(&self->blocks[i]);
@@ -77,5 +84,45 @@ void arena_clear(Arena *const self) {
 
     free(self->blocks);
     self->blocks = NULL;
+}
+
+void arenavec_init(
+    struct ArenaVec *const self, 
+    struct Arena *const backing_arena, 
+    usize const element_size
+) {
+    self->backing_arena = backing_arena;
+    self->element_size = element_size;
+    self->data = NULL;
+    self->len = 0u;
+    self->cap = 0u;
+}
+
+void *arenavec_at(
+    struct ArenaVec const *const self, 
+    usize const index
+) {
+    if (index >= self->len) {
+        log_error("arenavec_at: index out of range (index = %zu, len = %zu)", index, self->len);
+        exit(1);
+    }
+
+    return self->data + index * self->element_size;
+}
+
+void arenavec_push(
+    struct ArenaVec *const self, 
+    void *const item
+) {
+    if (self->len + 1 > self->cap) {
+        self->cap = (self->cap == 0u) 
+            ? 16u // hardcoded initial capacity
+            : self->cap * 2;
+
+        self->data = arena_alloc(self->backing_arena, self->element_size * self->cap);
+    }
+
+    memcpy(self->data + self->len * self->element_size, item, self->element_size);
+    self->len += 1;
 }
 

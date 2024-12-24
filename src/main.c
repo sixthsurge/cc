@@ -28,7 +28,7 @@ i32 main() {
 
     // Lexical analysis
 
-    log_trace("---- Lexical analysis ----");
+    log_trace("Lexical analysis");
 
     TokenVec tokens = tokenize(source);
 
@@ -38,23 +38,30 @@ i32 main() {
 
     // Syntax analysis
 
-    log_trace("---- Syntax analysis ----");
+    log_trace("Syntax analysis");
 
     Arena ast_arena;
     arena_init(&ast_arena, ARENA_BLOCK_LEN);
 
-    Parser parser;
-    parser_init(&parser, tokenvec_slice_whole(&tokens));
+    struct Parser parser;
+    parser_init(&parser, &ast_arena, tokenvec_slice_whole(&tokens));
 
-    ParseResult const result = parse_block(&ast_arena, &parser);
+    struct AstRoot ast;
+    struct ParseResult const result = parse_root(&ast, &parser);
+
+    if (!result.ok) {
+        log_error("parsing error %zu:%zu", result.error.position.line, result.error.position.character);
+        parse_error_debug(&stdout_writer, &result.error);
+        return 1;
+    }
 
     puts("AST:");
-    ast_debug(&stdout_writer, &result.node);
+    ast_debug_block(&stdout_writer, &ast);
     puts("\n");
 
-    // Semantic analysis
+    // Compiling
 
-    log_trace("---- Semantic analysis ----");
+    log_trace("Compiling");
 
     // Cleanup
 
