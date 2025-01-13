@@ -3,7 +3,7 @@
 #include "slice.h"
 #include "writer.h"
 
-void token_kind_debug(struct Writer *writer, TokenKind const *kind) {
+void token_kind_debug(struct Writer *writer, enum TokenKind const *kind) {
     char const *const token_names[] = {
         "<unknown>",
         // misc
@@ -54,7 +54,7 @@ void token_kind_debug(struct Writer *writer, TokenKind const *kind) {
     }
 }
 
-void token_debug(struct Writer *writer, Token const *token) {
+void token_debug(struct Writer *writer, struct Token const *token) {
     switch (token->kind) {
         case TokenIdentifier: {
             writer_write(writer, "<identifier: ");
@@ -75,7 +75,7 @@ void token_debug(struct Writer *writer, Token const *token) {
     }
 }
 
-#define SLICE_ELEMENT_TYPE Token
+#define SLICE_ELEMENT_TYPE struct Token
 #define SLICE_TYPE TokenSlice 
 #define SLICE_FUNCTION_PREFIX tokenslice_
 #define SLICE_DEBUG_FN token_debug
@@ -85,7 +85,7 @@ void token_debug(struct Writer *writer, Token const *token) {
 #undef SLICE_FUNCTION_PREFIX
 #undef SLICE_DEBUG_FN
 
-#define VEC_ELEMENT_TYPE Token
+#define VEC_ELEMENT_TYPE struct Token
 #define VEC_TYPE TokenVec
 #define VEC_SLICE_TYPE TokenSlice
 #define VEC_FUNCTION_PREFIX tokenvec_

@@ -10,19 +10,19 @@ enum ParseErrorKind {
 };
 
 struct Parser {
-    TokenSlice tokens;
-    Token last_token;
-    Arena *ast_arena;
+    struct TokenSlice tokens;
+    struct Token last_token;
+    struct Arena *ast_arena;
 };
 
 struct ParseError {
     enum ParseErrorKind kind;
-    TokenPosition position;
+    struct TokenPosition position;
 
     union {
         struct {
-            TokenKind found;
-            TokenKind const *expected;
+            enum TokenKind found;
+            enum TokenKind const *expected;
             usize expected_count;
         } unexpected_token;
         struct {
@@ -36,8 +36,9 @@ struct ParseResult {
     struct ParseError error;
 };
 
-void parser_init(struct Parser *self, Arena *ast_arena, TokenSlice tokens);
+void parser_init(struct Parser *self, struct Arena *ast_arena, struct TokenSlice tokens);
 
+struct ParseResult parse_root(struct AstRoot *out, struct Parser *parser);
 struct ParseResult parse_block(struct AstBlock *out, struct Parser *parser);
 struct ParseResult parse_statement(struct AstStatement *out, struct Parser *parser);
 struct ParseResult parse_variable_declaration(struct AstVariableDeclaration *out, struct Parser *parser);

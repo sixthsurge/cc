@@ -13,21 +13,21 @@
 #define VEC_CONCAT2(a, b) VEC_CONCAT1(a, b)
 #define VEC_PREFIX(function) VEC_CONCAT2(VEC_FUNCTION_PREFIX, function)
 
-void VEC_PREFIX(init)(VEC_TYPE *const self) {
+void VEC_PREFIX(init)(struct VEC_TYPE *const self) {
     self->len = 0u;
     self->capacity = 0u;
 
     self->data = (VEC_ELEMENT_TYPE *) NULL;
 }
 
-void VEC_PREFIX(init_with_capacity)(VEC_TYPE *const self, usize const capacity) {
+void VEC_PREFIX(init_with_capacity)(struct VEC_TYPE *const self, usize const capacity) {
     self->len = 0u;
     self->capacity = capacity;
 
     self->data = (VEC_ELEMENT_TYPE *) malloc(sizeof (VEC_ELEMENT_TYPE) * capacity);
 }
 
-void VEC_PREFIX(init_clone)(VEC_TYPE *const self, VEC_TYPE const *const other) {
+void VEC_PREFIX(init_clone)(struct VEC_TYPE *const self, struct VEC_TYPE const *const other) {
     self->len = other->len;
     self->capacity = other->len;
 
@@ -35,7 +35,7 @@ void VEC_PREFIX(init_clone)(VEC_TYPE *const self, VEC_TYPE const *const other) {
     memcpy(self->data, other->data, sizeof (VEC_ELEMENT_TYPE) * self->len);
 }
 
-void VEC_PREFIX(init_from_slice)(VEC_TYPE *const self, VEC_SLICE_TYPE const slice) {
+void VEC_PREFIX(init_from_slice)(struct VEC_TYPE *const self, struct VEC_SLICE_TYPE const slice) {
     self->len = slice.len;
     self->capacity = slice.len;
 
@@ -43,11 +43,11 @@ void VEC_PREFIX(init_from_slice)(VEC_TYPE *const self, VEC_SLICE_TYPE const slic
     memcpy(self->data, slice.ptr, sizeof (VEC_ELEMENT_TYPE) * slice.len);
 }
 
-void VEC_PREFIX(free)(VEC_TYPE *const self) {
+void VEC_PREFIX(free)(struct VEC_TYPE *const self) {
     free(self->data);
 }
 
-VEC_ELEMENT_TYPE *VEC_PREFIX(at)(VEC_TYPE const *const self, usize const index) {
+VEC_ELEMENT_TYPE *VEC_PREFIX(at)(struct VEC_TYPE const *const self, usize const index) {
     if (index < self->len) {
         return &self->data[index];
     } else {
@@ -56,7 +56,7 @@ VEC_ELEMENT_TYPE *VEC_PREFIX(at)(VEC_TYPE const *const self, usize const index) 
     }
 }
 
-VEC_SLICE_TYPE VEC_PREFIX(slice)(VEC_TYPE const *const self, usize const begin, usize const end) {
+struct VEC_SLICE_TYPE VEC_PREFIX(slice)(struct VEC_TYPE const *const self, usize const begin, usize const end) {
     if (begin > end) {
         log_error("vec_slice: begin > end (begin = %zu, end = %zu)", begin, end);
         exit(1);
@@ -66,20 +66,20 @@ VEC_SLICE_TYPE VEC_PREFIX(slice)(VEC_TYPE const *const self, usize const begin, 
         exit(1);
     }
 
-    return (VEC_SLICE_TYPE) {
+    return (struct VEC_SLICE_TYPE) {
         .ptr = self->data + begin,
         .len = end - begin,
     };
 }
 
-VEC_SLICE_TYPE VEC_PREFIX(slice_whole)(VEC_TYPE const *const self) {
-    return (VEC_SLICE_TYPE) {
+struct VEC_SLICE_TYPE VEC_PREFIX(slice_whole)(struct VEC_TYPE const *const self) {
+    return (struct VEC_SLICE_TYPE) {
         .ptr = self->data,
         .len = self->len,
     };
 }
 
-void VEC_PREFIX(resize)(VEC_TYPE *const self, usize const new_capacity) {
+void VEC_PREFIX(resize)(struct VEC_TYPE *const self, usize const new_capacity) {
     if (new_capacity < self->len) {
         log_error("vec_resize: shrinking beyond length (length = %zu, desired capacity = %zu)", self->len, new_capacity);
         exit(1);
@@ -92,7 +92,7 @@ void VEC_PREFIX(resize)(VEC_TYPE *const self, usize const new_capacity) {
     }
 }
 
-void VEC_PREFIX(reserve)(VEC_TYPE *const self, usize const n) {
+void VEC_PREFIX(reserve)(struct VEC_TYPE *const self, usize const n) {
     usize min_capacity = self->len + n;
 
     if (min_capacity > self->capacity) {
@@ -100,21 +100,21 @@ void VEC_PREFIX(reserve)(VEC_TYPE *const self, usize const n) {
     }
 }
 
-void VEC_PREFIX(push)(VEC_TYPE *const self, VEC_ELEMENT_TYPE const el) {
+void VEC_PREFIX(push)(struct VEC_TYPE *const self, VEC_ELEMENT_TYPE const el) {
     VEC_PREFIX(reserve)(self, 1u);
 
     self->data[self->len] = el;
     self->len += 1u;
 }
 
-void VEC_PREFIX(push_slice)(VEC_TYPE *const self, VEC_SLICE_TYPE const slice) {
+void VEC_PREFIX(push_slice)(struct VEC_TYPE *const self, struct VEC_SLICE_TYPE const slice) {
     VEC_PREFIX(reserve)(self, slice.len);
 
     memmove(self->data + self->len, slice.ptr, slice.len * sizeof (VEC_ELEMENT_TYPE));
     self->len += slice.len;
 }
 
-void VEC_PREFIX(insert)(VEC_TYPE *const self, usize const index, VEC_ELEMENT_TYPE const el) {
+void VEC_PREFIX(insert)(struct VEC_TYPE *const self, usize const index, VEC_ELEMENT_TYPE const el) {
     if (index >= self->len) {
         log_error("vec_insert: index out of range (index = %zu, length = %zu)", index, self->len);
         exit(1);
@@ -130,7 +130,7 @@ void VEC_PREFIX(insert)(VEC_TYPE *const self, usize const index, VEC_ELEMENT_TYP
     self->len += 1;
 }
 
-void VEC_PREFIX(insert_slice)(VEC_TYPE *const self, usize const index, VEC_SLICE_TYPE const slice) {
+void VEC_PREFIX(insert_slice)(struct VEC_TYPE *const self, usize const index, struct VEC_SLICE_TYPE const slice) {
     if (index >= self->len) {
         log_error("vec_insert_slice: index out of range (index = %zu, length = %zu)", index, self->len);
         exit(1);
@@ -146,7 +146,7 @@ void VEC_PREFIX(insert_slice)(VEC_TYPE *const self, usize const index, VEC_SLICE
     self->len += slice.len;
 }
 
-void VEC_PREFIX(remove_at)(VEC_TYPE *const self, usize const index) {
+void VEC_PREFIX(remove_at)(struct VEC_TYPE *const self, usize const index) {
     if (index >= self->len) {
         log_error("vec_remove_at: index out of range (index = %zu, length = %zu)", index, self->len);
         exit(1);
@@ -156,7 +156,7 @@ void VEC_PREFIX(remove_at)(VEC_TYPE *const self, usize const index) {
     self->len -= 1;
 }
 
-void VEC_PREFIX(remove_range)(VEC_TYPE *const self, usize begin, usize end) {
+void VEC_PREFIX(remove_range)(struct VEC_TYPE *const self, usize begin, usize end) {
     if (begin > end) {
         log_error("vec_remove_range: begin > end (begin = %zu, end = %zu)", begin, end);
         exit(1);
@@ -173,7 +173,7 @@ void VEC_PREFIX(remove_range)(VEC_TYPE *const self, usize begin, usize end) {
 }
 
 #ifdef VEC_DEBUG_FN
-void VEC_PREFIX(debug)(struct Writer *const writer, VEC_TYPE const *const self) {
+void VEC_PREFIX(debug)(struct Writer *const writer, struct VEC_TYPE const *const self) {
     writer_write(writer, "[");
     for (usize i = 0; i < self->len; ++i) {
         VEC_DEBUG_FN(writer, &self->data[i]);

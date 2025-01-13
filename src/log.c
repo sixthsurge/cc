@@ -8,9 +8,9 @@
 #include <time.h>
 
 static struct {
-    LogLevel   log_level;
-    bool       write_to_stdout;
-    bool       write_to_file;
+    enum LogLevel log_level;
+    bool write_to_stdout;
+    bool write_to_file;
     char const *log_file_path;
 } log;
 
@@ -33,7 +33,7 @@ static char const *const log_level_colors[] = {
 static bool log_initialized = false;
 
 void log_init(
-    LogLevel log_level,
+    enum LogLevel log_level,
     bool write_to_stdout,
     bool write_to_file,
     char const *log_file_path
@@ -46,7 +46,7 @@ void log_init(
 }
 
 void vlog(
-    LogLevel log_level,
+    enum LogLevel log_level,
     char const *format_string,
     va_list args
 ) {

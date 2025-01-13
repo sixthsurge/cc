@@ -5,7 +5,7 @@
 
 struct Writer;
 
-typedef enum {
+enum TokenKind {
     TokenUnknown,
 
     // Misc
@@ -52,28 +52,28 @@ typedef enum {
     TokenInteger,
 
     TokenCount,
-} TokenKind;
+};
 
-typedef struct {
+struct TokenPosition {
     usize line;
     usize character;
-} TokenPosition;
+};
 
-typedef struct {
-    TokenKind kind;
-    TokenPosition position;
+struct Token {
+    enum TokenKind kind;
+    struct TokenPosition position;
 
     union {
-        CharSlice identifier_name;
+        struct CharSlice identifier_name;
         i32 integer_value;
     };
-} Token;
+};
 
-void token_kind_debug(struct Writer *writer, TokenKind const *kind);
-void token_debug(struct Writer *writer, Token const *token);
+void token_kind_debug(struct Writer *writer, enum TokenKind const *kind);
+void token_debug(struct Writer *writer, struct Token const *token);
 
 #define SLICE_TYPE TokenSlice 
-#define SLICE_ELEMENT_TYPE Token
+#define SLICE_ELEMENT_TYPE struct Token
 #define SLICE_FUNCTION_PREFIX tokenslice_
 #define SLICE_DEBUG_FN token_debug
 #include "template/slice.h"
@@ -83,7 +83,7 @@ void token_debug(struct Writer *writer, Token const *token);
 #undef SLICE_DEBUG_FN
 
 #define VEC_TYPE TokenVec
-#define VEC_ELEMENT_TYPE Token
+#define VEC_ELEMENT_TYPE struct Token
 #define VEC_SLICE_TYPE TokenSlice
 #define VEC_FUNCTION_PREFIX tokenvec_
 #define VEC_DEBUG_FN token_debug

@@ -4,17 +4,17 @@
 
 #include "common.h"
 
-typedef enum {
+enum LogLevel {
     LOG_LEVEL_DISABLED, // log disabled
     LOG_LEVEL_TRACE,    // unimportant information
     LOG_LEVEL_INFO,     // important information
     LOG_LEVEL_WARNING,  // warning
     LOG_LEVEL_ERROR,    // fatal error
-} LogLevel;
+};
 
 /// initialize the logger
 void log_init(
-    LogLevel log_level,
+    enum LogLevel log_level,
     bool write_to_stdout,
     bool write_to_file,
     char const *log_file_path
@@ -22,7 +22,7 @@ void log_init(
 
 /// function to write a message to the log
 void vlog(
-    LogLevel log_level,
+    enum LogLevel log_level,
     char const *format_string,
     va_list args
 );

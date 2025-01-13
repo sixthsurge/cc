@@ -22,7 +22,7 @@ struct MAP_PREFIX(Entry) {
 };
 
 void MAP_PREFIX(init)(
-    MAP_TYPE *const self,
+    struct MAP_TYPE *const self,
     usize const table_size
 ) {
     self->table_size    = table_size;
@@ -31,8 +31,8 @@ void MAP_PREFIX(init)(
 }
 
 void MAP_PREFIX(clone)(
-    MAP_TYPE *const self,
-    MAP_TYPE const *const other
+    struct MAP_TYPE *const self,
+    struct MAP_TYPE const *const other
 ) {
     self->table_size    = other->table_size;
     self->element_count = other->element_count;
@@ -42,7 +42,7 @@ void MAP_PREFIX(clone)(
 }
 
 void MAP_PREFIX(free)(
-    MAP_TYPE *const self
+    struct MAP_TYPE *const self
 ) {
     for (usize entry_index = 0u; entry_index < self->table_size; ++entry_index) {
         struct MAP_PREFIX(Entry) *entry = (struct MAP_PREFIX(Entry) *) self->entries[entry_index];
@@ -58,7 +58,7 @@ void MAP_PREFIX(free)(
 }
 
 MAP_VALUE_TYPE *MAP_PREFIX(get)(
-    MAP_TYPE const *const self,
+    struct MAP_TYPE const *const self,
     MAP_KEY_TYPE const key
 ) {
     usize const entry_index = MAP_KEY_HASH_FN(key) % self->table_size;
@@ -78,7 +78,7 @@ MAP_VALUE_TYPE *MAP_PREFIX(get)(
 }
 
 void MAP_PREFIX(set)(
-    MAP_TYPE *const self, 
+    struct MAP_TYPE *const self, 
     MAP_KEY_TYPE const key, 
     MAP_VALUE_TYPE const value
 ) {
@@ -105,7 +105,7 @@ void MAP_PREFIX(set)(
 }
 
 bool MAP_PREFIX(remove)(
-    MAP_TYPE *const self,
+    struct MAP_TYPE *const self,
     MAP_KEY_TYPE const key
 ) {
     usize const entry_index = MAP_KEY_HASH_FN(key) % self->table_size;

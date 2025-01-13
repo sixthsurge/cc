@@ -10,15 +10,14 @@
 #define SLICE_CONCAT2(a, b) SLICE_CONCAT1(a, b)
 #define SLICE_PREFIX(function) SLICE_CONCAT2(SLICE_FUNCTION_PREFIX, function)
 
-struct Writer;
-
-typedef struct { 
+struct SLICE_TYPE { 
     SLICE_ELEMENT_TYPE *ptr;
     usize len;
-} SLICE_TYPE;
+};
 
 #ifdef SLICE_DEBUG_FN
-void SLICE_PREFIX(debug)(struct Writer *writer, SLICE_TYPE const *self);
+struct Writer;
+void SLICE_PREFIX(debug)(struct Writer *writer, struct SLICE_TYPE const *self);
 #endif
 
 #undef SLICE_CONCAT1

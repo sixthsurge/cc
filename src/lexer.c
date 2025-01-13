@@ -6,13 +6,13 @@
 #include "slice.h"
 #include "token.h"
 
-typedef struct Lexer {
+struct Lexer {
     char const *source_string;
 
     usize character_index;
     usize line_index;
     usize line_start_index;
-} Lexer;
+};
 
 static bool is_whitespace(char const c) {
     return c == ' '
@@ -29,14 +29,14 @@ static bool is_letter_underscore_or_digit(char const c) {
     return is_letter_or_underscore(c) || isdigit(c);
 }
 
-static void lexer_init(Lexer *const self, char const *const source_string) {
+static void lexer_init(struct Lexer *const self, char const *const source_string) {
     self->source_string = source_string;
     self->character_index = 0u;
     self->line_index = 1u;
     self->line_start_index = 0u;
 }
 
-static char lexer_next_char(Lexer *const self) {
+static char lexer_next_char(struct Lexer *const self) {
     char const c = self->source_string[self->character_index];
     self->character_index += 1;
 
@@ -49,17 +49,17 @@ static char lexer_next_char(Lexer *const self) {
     return c;
 }
 
-static char lexer_peek_char(Lexer *const self) {
+static char lexer_peek_char(struct Lexer *const self) {
     return self->source_string[self->character_index];
 }
 
-static void lexer_skip_whitespace(Lexer *const self) {
+static void lexer_skip_whitespace(struct Lexer *const self) {
     while (is_whitespace(lexer_peek_char(self))) {
         lexer_next_char(self);
     }
 }
 
-static CharSlice lexer_next_word(Lexer *const self) {
+static struct CharSlice lexer_next_word(struct Lexer *const self) {
     char const *const ptr = self->source_string + self->character_index;
 
     usize len = 0;
@@ -68,16 +68,16 @@ static CharSlice lexer_next_word(Lexer *const self) {
         lexer_next_char(self);
     }
 
-    return (CharSlice) { (char *) ptr, len };
+    return (struct CharSlice) { (char *) ptr, len };
 }
 
-static Token lexer_next_token(Lexer *const self) {
+static struct Token lexer_next_token(struct Lexer *const self) {
     lexer_skip_whitespace(self);
 
     char const c = lexer_next_char(self);
 
-    Token token = (Token) {
-        .position = (TokenPosition) {
+    struct Token token = (struct Token) {
+        .position = (struct TokenPosition) {
             .line = self->line_index,
             .character = self->character_index - self->line_start_index,
         }
@@ -149,14 +149,14 @@ static Token lexer_next_token(Lexer *const self) {
             if (isdigit(c)) {
                 // number
                 self->character_index -= 1;
-                CharSlice const word = lexer_next_word(self);
+                struct CharSlice const word = lexer_next_word(self);
 
                 token.kind = TokenInteger;
                 token.integer_value = atoi(word.ptr);
             } else if (is_letter_or_underscore(c)) {
                 // word
                 self->character_index -= 1;
-                CharSlice const word = lexer_next_word(self);
+                struct CharSlice const word = lexer_next_word(self);
 
                 if (charslice_eq_cstr(word, "return")) {
                     token.kind = TokenKeywordReturn;
@@ -207,14 +207,14 @@ static Token lexer_next_token(Lexer *const self) {
     return token;
 }
 
-TokenVec tokenize(char const *const source_string) {
-    Lexer lexer;
+struct TokenVec tokenize(char const *const source_string) {
+    struct Lexer lexer;
     lexer_init(&lexer, source_string);
 
-    TokenVec tokens;
+    struct TokenVec tokens;
     tokenvec_init(&tokens);
 
-    Token token;
+    struct Token token;
     do {
         token = lexer_next_token(&lexer);
         tokenvec_push(&tokens, token);

@@ -1,20 +1,21 @@
 #include "parser.h"
 
-#include <stdlib.h>
-
 #include "ast.h"
-#include "log.h"
 #include "token.h"
 #include "writer.h"
 
 typedef struct ParseResult (*ExpressionParser)(struct AstExpression *, struct Parser *);
 
-void parser_init(struct Parser *const self, Arena *const ast_arena, TokenSlice const tokens) {
+void parser_init(
+    struct Parser *const self, 
+    struct Arena *const ast_arena, 
+    struct TokenSlice const tokens
+) {
     self->tokens = tokens;
     self->ast_arena = ast_arena;
 }
 
-static Token parser_peek(struct Parser const *const self) {
+static struct Token parser_peek(struct Parser const *const self) {
     return self->tokens.ptr[0];
 }
 
@@ -29,7 +30,7 @@ static bool parser_next(struct Parser *const self) {
     }
 }
 
-static bool parser_accept(struct Parser *const self, TokenKind type) {
+static bool parser_accept(struct Parser *const self, enum TokenKind type) {
     if (parser_peek(self).kind == type) {
         parser_next(self);
         return true;
@@ -40,7 +41,7 @@ static bool parser_accept(struct Parser *const self, TokenKind type) {
 
 static struct ParseError parser_expected_tokens(
     struct Parser const *const self,
-    TokenKind const *expected,
+    enum TokenKind const *expected,
     usize expected_count
 ) {
     return (struct ParseError) {
@@ -48,7 +49,7 @@ static struct ParseError parser_expected_tokens(
         .position = parser_peek(self).position,
         .unexpected_token = {
             .found = parser_peek(self).kind,
-            .expected = arena_copy(self->ast_arena, expected, sizeof (TokenKind) * expected_count),
+            .expected = arena_copy(self->ast_arena, expected, sizeof (enum TokenKind) * expected_count),
             .expected_count = expected_count,
         },
     };
@@ -56,12 +57,12 @@ static struct ParseError parser_expected_tokens(
 
 static struct ParseError parser_expected_token(
     struct Parser const *const self,
-    TokenKind const expected
+    enum TokenKind const expected
 ) {
     return parser_expected_tokens(self, &expected, 1u);
 }
 
-static struct ParseResult parse_ok() {
+static struct ParseResult parse_ok(void) {
     return (struct ParseResult) {
         .ok = true,
     };
@@ -79,8 +80,8 @@ static struct ParseResult parse_error(struct ParseError error) {
         return result;         \
     }
 
-#define PARSER_EXPECT(PARSER, EXPECTED_TOKEN)                                \
-    if (!parser_accept(PARSER, EXPECTED_TOKEN)) {                            \
+#define PARSER_EXPECT(PARSER, EXPECTED_TOKEN)                              \
+    if (!parser_accept(PARSER, EXPECTED_TOKEN)) {                          \
         return parse_error(parser_expected_token(PARSER, EXPECTED_TOKEN)); \
     }
 
@@ -89,7 +90,7 @@ static struct ParseResult parse_binary_operation(
     struct Parser *const parser,
     usize op_count,
     enum AstBinaryOpKind const *ops,
-    TokenKind const *tokens,
+    enum TokenKind const *tokens,
     ExpressionParser const same_precedence,
     ExpressionParser const next_precedence
 ) {
@@ -118,6 +119,10 @@ static struct ParseResult parse_binary_operation(
 
     *out = left;
     return parse_ok();
+}
+
+struct ParseResult parse_root(struct AstRoot *const out, struct Parser *const parser) {
+    return parse_block(&out->block, parser);
 }
 
 struct ParseResult parse_block(struct AstBlock *const out, struct Parser *const parser) {
@@ -199,7 +204,7 @@ struct ParseResult parse_expression(struct AstExpression *const out, struct Pars
 
 struct ParseResult parse_assignment_expression(struct AstExpression *const out, struct Parser *const parser) {
     enum AstBinaryOpKind const ops[] = { AstBinaryOpAssignment };
-    TokenKind const tokens[] = { TokenOperatorAssignment };
+    enum TokenKind const tokens[] = { TokenOperatorAssignment };
 
     return parse_binary_operation(
         out, 
@@ -214,7 +219,7 @@ struct ParseResult parse_assignment_expression(struct AstExpression *const out, 
 
 struct ParseResult parse_additive_expression(struct AstExpression *const out, struct Parser *const parser) {
     enum AstBinaryOpKind const ops[] = { AstBinaryOpAddition, AstBinaryOpSubtraction };
-    TokenKind const tokens[] = { TokenOperatorAdd, TokenOperatorSub };
+    enum TokenKind const tokens[] = { TokenOperatorAdd, TokenOperatorSub };
 
     return parse_binary_operation(
         out, 
@@ -229,7 +234,7 @@ struct ParseResult parse_additive_expression(struct AstExpression *const out, st
 
 struct ParseResult parse_multiplicative_expression(struct AstExpression *const out, struct Parser *const parser) {
     enum AstBinaryOpKind const ops[] = { AstBinaryOpMultiplication, AstBinaryOpDivision };
-    TokenKind const tokens[] = { TokenOperatorMul, TokenOperatorDiv };
+    enum TokenKind const tokens[] = { TokenOperatorMul, TokenOperatorDiv };
 
     return parse_binary_operation(
         out, 
@@ -264,7 +269,7 @@ struct ParseResult parse_primary_expression(struct AstExpression *const out, str
             return parse_ok();
         }
         default: {
-            TokenKind const expected[] = { TokenIdentifier, TokenInteger, TokenLeftParen };
+            enum TokenKind const expected[] = { TokenIdentifier, TokenInteger, TokenLeftParen };
             return parse_error(parser_expected_tokens(parser, expected, 3));
         }
     }

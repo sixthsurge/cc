@@ -13,32 +13,32 @@
 
 struct Writer;
 
-typedef struct VEC_TYPE {
+struct VEC_TYPE {
     usize len;
     usize capacity;
     VEC_ELEMENT_TYPE *data; 
-} VEC_TYPE;
+};
 
-void              VEC_PREFIX(init)              (VEC_TYPE *self);
-void              VEC_PREFIX(init_with_capacity)(VEC_TYPE *self, usize capacity);
-void              VEC_PREFIX(clone)             (VEC_TYPE *self, VEC_TYPE const *other);
-void              VEC_PREFIX(init_from_slice)   (VEC_TYPE *self, VEC_SLICE_TYPE slice);
-void              VEC_PREFIX(free)              (VEC_TYPE *self);
-VEC_ELEMENT_TYPE *VEC_PREFIX(at)                (VEC_TYPE const *self, usize index);
-VEC_SLICE_TYPE    VEC_PREFIX(slice)             (VEC_TYPE const *self, usize begin, usize end);
-VEC_SLICE_TYPE    VEC_PREFIX(slice_whole)       (VEC_TYPE const *self);
-void              VEC_PREFIX(resize)            (VEC_TYPE *self, usize new_capacity);
-void              VEC_PREFIX(reserve)           (VEC_TYPE *self, usize n);
-void              VEC_PREFIX(push)              (VEC_TYPE *self, VEC_ELEMENT_TYPE el);
-void              VEC_PREFIX(push_slice)        (VEC_TYPE *self, VEC_SLICE_TYPE slice);
-void              VEC_PREFIX(insert)            (VEC_TYPE *self, usize index, VEC_ELEMENT_TYPE el);
-void              VEC_PREFIX(insert_slice)      (VEC_TYPE *self, usize index, VEC_SLICE_TYPE slice);
-void              VEC_PREFIX(remove_at)         (VEC_TYPE *self, usize index);
-void              VEC_PREFIX(remove_range)      (VEC_TYPE *self, usize begin, usize end);
-void              VEC_PREFIX(clear)             (VEC_TYPE *self);
+void                     VEC_PREFIX(init)              (struct VEC_TYPE *self);
+void                     VEC_PREFIX(init_with_capacity)(struct VEC_TYPE *self, usize capacity);
+void                     VEC_PREFIX(clone)             (struct VEC_TYPE *self, struct VEC_TYPE const *other);
+void                     VEC_PREFIX(init_from_slice)   (struct VEC_TYPE *self, struct VEC_SLICE_TYPE slice);
+void                     VEC_PREFIX(free)              (struct VEC_TYPE *self);
+VEC_ELEMENT_TYPE        *VEC_PREFIX(at)                (struct VEC_TYPE const *self, usize index);
+struct VEC_SLICE_TYPE    VEC_PREFIX(slice)             (struct VEC_TYPE const *self, usize begin, usize end);
+struct VEC_SLICE_TYPE    VEC_PREFIX(slice_whole)       (struct VEC_TYPE const *self);
+void                     VEC_PREFIX(resize)            (struct VEC_TYPE *self, usize new_capacity);
+void                     VEC_PREFIX(reserve)           (struct VEC_TYPE *self, usize n);
+void                     VEC_PREFIX(push)              (struct VEC_TYPE *self, VEC_ELEMENT_TYPE el);
+void                     VEC_PREFIX(push_slice)        (struct VEC_TYPE *self, struct VEC_SLICE_TYPE slice);
+void                     VEC_PREFIX(insert)            (struct VEC_TYPE *self, usize index, VEC_ELEMENT_TYPE el);
+void                     VEC_PREFIX(insert_slice)      (struct VEC_TYPE *self, usize index, struct VEC_SLICE_TYPE slice);
+void                     VEC_PREFIX(remove_at)         (struct VEC_TYPE *self, usize index);
+void                     VEC_PREFIX(remove_range)      (struct VEC_TYPE *self, usize begin, usize end);
+void                     VEC_PREFIX(clear)             (struct VEC_TYPE *self);
 
 #ifdef VEC_DEBUG_FN
-void              VEC_PREFIX(debug)             (struct Writer *writer, VEC_TYPE const *self);
+void              VEC_PREFIX(debug)             (struct Writer *writer, struct VEC_TYPE const *self);
 #endif
 
 #undef VEC_CONCAT1

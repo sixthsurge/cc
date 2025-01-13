@@ -47,7 +47,7 @@ struct AstType {
 };
 
 struct AstIdentifier {
-    CharSlice name;
+    struct CharSlice name;
 };
 
 struct AstConstant {
@@ -135,8 +135,9 @@ struct AstTopLevelItem {
 };
 
 struct AstRoot {
-    struct AstTopLevelItem const *items;
-    usize item_count;
+    //struct AstTopLevelItem const *items;
+    //usize item_count;
+    struct AstBlock block;
 };
 
 void ast_debug_root(struct Writer *writer, struct AstRoot const *self);

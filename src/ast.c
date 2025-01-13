@@ -1,10 +1,9 @@
 #include "ast.h"
 
-#include <stdlib.h>
-#include "slice.h"
 #include "writer.h"
 
 void ast_debug_root(struct Writer *writer, struct AstRoot const *self) {
+/*
     writer_write(writer, "Root(items = [");
     for (usize i = 0; i < self->item_count; ++i) {
         ast_debug_top_level_item(writer, &self->items[i]);
@@ -14,6 +13,9 @@ void ast_debug_root(struct Writer *writer, struct AstRoot const *self) {
         }
     }
     writer_write(writer, "])");
+*/
+
+    ast_debug_block(writer, &self->block);
 }
 
 void ast_debug_top_level_item(struct Writer *writer, struct AstTopLevelItem const *self) {

@@ -7,22 +7,22 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-Writer file_writer(FILE *const file) {
-    return (Writer) {
+struct Writer file_writer(FILE *const file) {
+    return (struct Writer) {
         .kind = WriterKindFile,
         .file = { .file = file },
     };
 }
 
-Writer charvec_writer(CharVec *const buffer) {
-    return (Writer) {
+struct Writer charvec_writer(struct CharVec *const buffer) {
+    return (struct Writer) {
         .kind = WriterKindCharVec,
         .charvec = { .buffer = buffer },
     };
 }
 
 void writer_write(
-    Writer const *const self,
+    struct Writer const *const self,
     char const *const string
 ) {
     switch (self->kind) {
@@ -42,7 +42,7 @@ void writer_write(
 }
 
 void writer_writef(
-    Writer const *const self,
+    struct Writer const *const self,
     char const *const format_string, 
     ...
 ) {
@@ -70,7 +70,7 @@ void writer_writef(
     va_end(args);
 }
 
-void writer_write_charslice(Writer const *self, CharSlice slice) {
+void writer_write_charslice(struct Writer const *self, struct CharSlice slice) {
     switch (self->kind) {
         case WriterKindFile: {
             fputs(charslice_as_cstr(slice), self->file.file);

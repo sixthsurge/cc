@@ -8,12 +8,8 @@
 #define SLICE_CONCAT2(a, b) SLICE_CONCAT1(a, b)
 #define SLICE_PREFIX(function) SLICE_CONCAT2(SLICE_FUNCTION_PREFIX, function)
 
-#define SLICE_CONCAT1(a, b) a##b
-#define SLICE_CONCAT2(a, b) SLICE_CONCAT1(a, b)
-#define SLICE_PREFIX(function) SLICE_CONCAT2(SLICE_FUNCTION_PREFIX, function)
-
 #ifdef SLICE_DEBUG_FN
-void SLICE_PREFIX(debug)(struct Writer *writer, SLICE_TYPE const *self) {
+void SLICE_PREFIX(debug)(struct Writer *writer, struct SLICE_TYPE const *self) {
     writer_write(writer, "[");
     for (usize i = 0; i < self->len; ++i) {
         SLICE_DEBUG_FN(writer, &self->ptr[i]);

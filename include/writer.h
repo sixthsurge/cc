@@ -7,13 +7,13 @@
 
 // Abstraction for writer to file or string buffer
 
-typedef enum WriterKind {
+enum WriterKind {
     WriterKindFile,
     WriterKindCharVec,
-} WriterKind;
+};
 
-typedef struct Writer {
-    WriterKind kind;
+struct Writer {
+    enum WriterKind kind;
 
     union {
         struct {
@@ -21,15 +21,15 @@ typedef struct Writer {
         } file;
 
         struct {
-            CharVec *buffer;
+            struct CharVec *buffer;
         } charvec;
     };
-} Writer;
+};
 
-Writer file_writer(FILE *file);
-Writer charvec_writer(CharVec *buffer);
+struct Writer file_writer(FILE *file);
+struct Writer charvec_writer(struct CharVec *buffer);
 
-void writer_write(Writer const *self, char const *string);
-void writer_writef(Writer const *self, char const *format_string, ...) ATTRIBUTE_PRINTF_LIKE(2, 3);
-void writer_write_charslice(Writer const *self, CharSlice slice);
+void writer_write(struct Writer const *self, char const *string);
+void writer_writef(struct Writer const *self, char const *format_string, ...) ATTRIBUTE_PRINTF_LIKE(2, 3);
+void writer_write_charslice(struct Writer const *self, struct CharSlice slice);
 

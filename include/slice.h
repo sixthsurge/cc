@@ -36,8 +36,8 @@
 // Specific helpers
 //--------------------------------------------------------------------------------
 
-char *charslice_as_cstr(CharSlice self);
-CharSlice charslice_from_cstr(char const *cstr);
+char *charslice_as_cstr(struct CharSlice self);
+struct CharSlice charslice_from_cstr(char const *cstr);
 
-bool charslice_eq(CharSlice self, CharSlice other);
-bool charslice_eq_cstr(CharSlice self, char const *cstr);
+bool charslice_eq(struct CharSlice self, struct CharSlice other);
+bool charslice_eq_cstr(struct CharSlice self, char const *cstr);
