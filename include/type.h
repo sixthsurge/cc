@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common.h"
+#include "writer.h"
 
 struct Type;
 
@@ -35,3 +36,5 @@ struct Type {
     };
 };
 
+usize type_size_bytes(struct Type type);
+void type_debug(struct Writer *writer, struct Type type);

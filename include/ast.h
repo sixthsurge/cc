@@ -91,7 +91,8 @@ struct AstVariableDeclaration {
 };
 
 struct AstReturn {
-    struct AstExpression expression;
+    bool has_returned_expression;
+    struct AstExpression returned_expression;
 };
 
 struct AstStatement {

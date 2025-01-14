@@ -184,18 +184,28 @@ struct ParseResult parse_variable_declaration(
     PARSER_EXPECT(parser, TokenKeywordInt);
     PARSER_EXPECT(parser, TokenIdentifier);
     out->identifier.name = parser->last_token.identifier_name;
+    out->type = (struct AstType) { .kind = AstTypeIntS32 };
 
     if (parser_accept(parser, TokenOperatorAssignment)) {
+        out->has_assigned_expression = true;
         struct ParseResult const result = parse_expression(&out->assigned_expression, parser);
         PARSER_REQUIRE(result);
-    } 
+    } else {
+        out->has_assigned_expression = true;
+    }
 
     return parse_ok();
 }
 
 struct ParseResult parse_return(struct AstReturn *const out, struct Parser *const parser) {
     PARSER_EXPECT(parser, TokenKeywordReturn);
-    return parse_expression(&out->expression, parser);
+    out->has_returned_expression = parser_peek(parser).kind != TokenSemicolon;
+
+    if (out->has_returned_expression) {
+        return parse_expression(&out->returned_expression, parser);
+    } else {
+        return parse_ok();
+    }
 }
 
 struct ParseResult parse_expression(struct AstExpression *const out, struct Parser *const parser) {

@@ -119,8 +119,11 @@ void ast_debug_variable_declaration(struct Writer *writer, struct AstVariableDec
 }
 
 void ast_debug_return(struct Writer *writer, struct AstReturn const *self) {
-    writer_write(writer, "Return(expression = ");
-    ast_debug_expression(writer, &self->expression);
+    writer_write(writer, "Return(");
+    if (self->has_returned_expression) {
+        writer_write(writer, "returned_expression = ");
+        ast_debug_expression(writer, &self->returned_expression);
+    }
     writer_write(writer, ")");
 }
 

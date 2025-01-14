@@ -21,12 +21,13 @@ struct MAP_TYPE {
     void **entries;
 };
 
-void            MAP_PREFIX(init)  (struct MAP_TYPE *self, usize table_size);
-void            MAP_PREFIX(clone) (struct MAP_TYPE *self, struct MAP_TYPE const *other);
-void            MAP_PREFIX(free)  (struct MAP_TYPE *self);
-MAP_VALUE_TYPE *MAP_PREFIX(get)   (struct MAP_TYPE const *self, MAP_KEY_TYPE key);
-void            MAP_PREFIX(set)   (struct MAP_TYPE *self, MAP_KEY_TYPE key, MAP_VALUE_TYPE value);
-bool            MAP_PREFIX(remove)(struct MAP_TYPE *self, MAP_KEY_TYPE key);
+void            MAP_PREFIX(init)        (struct MAP_TYPE *self, usize table_size);
+void            MAP_PREFIX(clone)       (struct MAP_TYPE *self, struct MAP_TYPE const *other);
+void            MAP_PREFIX(free)        (struct MAP_TYPE *self);
+MAP_VALUE_TYPE *MAP_PREFIX(get)         (struct MAP_TYPE const *self, MAP_KEY_TYPE key);
+bool            MAP_PREFIX(contains_key)(struct MAP_TYPE const *self, MAP_KEY_TYPE key);
+void            MAP_PREFIX(set)         (struct MAP_TYPE *self, MAP_KEY_TYPE key, MAP_VALUE_TYPE value);
+bool            MAP_PREFIX(remove)      (struct MAP_TYPE *self, MAP_KEY_TYPE key);
 
 #undef MAP_CONCAT1
 #undef MAP_CONCAT2

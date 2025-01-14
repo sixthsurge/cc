@@ -26,6 +26,14 @@ static char const *const color_green   = "\e[0;32m";
 static char const *const color_yellow  = "\e[0;33m";
 static char const *const color_magenta = "\e[0;35m";
 
+static inline usize max_usize(usize const a, usize const b) {
+    if (a > b) {
+        return a;
+    } else {
+        return b;
+    }
+}
+
 #ifdef __GNUC__
     #define LIKELY(COND)   __builtin_expect(!!(COND), 1)
     #define UNLIKELY(COND) __builtin_expect(!!(COND), 0)

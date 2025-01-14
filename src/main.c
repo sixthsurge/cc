@@ -75,6 +75,10 @@ i32 main(void) {
     fwrite(assembly_string.data, sizeof (char), assembly_string.len, asm_file);
     fclose(asm_file);
 
+    puts("Assembly:");
+    writer_write_charslice(&stdout_writer, charvec_slice_whole(&assembly_string));
+    puts("");
+
     // Assembling 
 
     log_trace("Assembling");

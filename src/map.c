@@ -1,3 +1,4 @@
+#include "map.h"
 #include "hash.h"
 #include "slice.h"
 

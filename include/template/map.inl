@@ -6,8 +6,6 @@
 // MAP_KEY_HASH_FN     | Hash function for keys   (MAP_KEY_TYPE -> usize)
 // MAP_KEY_EQ_FN       | Hash function for values (MAP_KEY_TYPE, MAP_KEY_TYPE -> bool)
 
-#include "template/map.h"
-
 #include <stdlib.h>
 #include <string.h>
 
@@ -75,6 +73,24 @@ MAP_VALUE_TYPE *MAP_PREFIX(get)(
 
     // not found
     return NULL;
+}
+
+bool MAP_PREFIX(contains_key)(
+    struct MAP_TYPE const *const self,
+    MAP_KEY_TYPE const key
+) {
+    usize const entry_index = MAP_KEY_HASH_FN(key) % self->table_size;
+    struct MAP_PREFIX(Entry) *entry = (struct MAP_PREFIX(Entry) *) self->entries[entry_index];
+
+    while (entry != NULL) {
+        if (MAP_KEY_EQ_FN(key, entry->key)) {
+            return true;
+        }
+
+        entry = entry->next;
+    }
+
+    return false;
 }
 
 void MAP_PREFIX(set)(

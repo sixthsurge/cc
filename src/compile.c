@@ -1,434 +1,433 @@
 #include "compile.h"
 
+#include <stdarg.h>
+
+#include "assembly.h"
 #include "ast.h"
-#include "map.h"
+#include "common.h"
+#include "log.h"
 #include "slice.h"
 #include "stdlib.h"
+#include "type.h"
+#include "variable_table.h"
+#include "vec.h"
 #include "writer.h"
 
-#define VARIABLE_TABLE_INDEX_SIZE 91
-
-struct VariableDescription {
-    struct CharSlice name;
+struct ExpressionValue {
+    bool has_value;
+    struct Operand operand;
     struct Type type;
+};
+
+struct CompileContext {
+    struct VariableTable *variable_table;
+    struct ExpressionValue last_expression_value;
     usize stack_offset;
+    usize stack_offset_temporary;
+    usize stack_offset_max;
 };
 
-struct VariableTable {
-    struct Map__CharSlice_usize variable_index;
-    struct VariableDescription *variable_descriptions;
-    usize variable_count;
-    usize variable_descriptions_capacity;
-};
-
-static void variable_table_init(
-    struct VariableTable *const self
-) {
-    map__charslice_usize__init(&self->variable_index, VARIABLE_TABLE_INDEX_SIZE);
-    self->variable_descriptions = NULL;
-    self->variable_count = 0u;
-    self->variable_descriptions_capacity = 0u;
+ATTRIBUTE_PRINTF_LIKE(1, 2) 
+static void compile_error(char const *const format_string, ...) {
+    printf("%scompile error: %s", color_red, color_reset);
+    va_list args;
+    va_start(args, format_string);
+    vprintf(format_string, args);
+    va_end(args);
+    exit(1);
 }
 
-static void variable_table_free(
-    struct VariableTable *const self 
-) {
-    map__charslice_usize__free(&self->variable_index);
-    free(self->variable_descriptions);
-}
+static usize round_up_usize(usize value, usize round) {
+    usize const floor = (value / round) * round;
 
-static void variable_table_insert(
-    struct VariableTable *const self,
-    struct VariableDescription const description
-) {
-    // add to list of variable descriptions
-
-    if (self->variable_descriptions == NULL) {
-        self->variable_descriptions_capacity = 1u;
-        self->variable_descriptions = malloc(sizeof (*self->variable_descriptions) * self->variable_descriptions_capacity);
-    } else if (self->variable_count + 1u >= self->variable_descriptions_capacity) {
-        self->variable_descriptions_capacity *= 2u;
-        self->variable_descriptions = realloc(self->variable_descriptions, sizeof (*self->variable_descriptions) * self->variable_descriptions_capacity);
-    }
-
-    self->variable_descriptions[self->variable_count] = description;
-
-    // add to index
-
-    map__charslice_usize__set(
-        &self->variable_index, 
-        description.name,
-        self->variable_count
-    );
-
-    // update variable count
-
-    self->variable_count += 1;
-}
-
-static char const *word_kind_name(
-    enum WordKind const word_kind
-) {
-    char const *const word_kind_names[4] = {
-        "byte",
-        "word",
-        "dword",
-        "qword"
-    };
-
-    return word_kind_names[word_kind];
-}
-
-static char const *register_name(
-    enum Register const reg,
-    enum WordKind const word_kind
-) {
-    char const *const register_names_byte[RegisterCount] = {
-        "al",
-        "bl",
-        "cl",
-        "dl",
-        "sil",
-        "dil",
-        "spl",
-        "bpl",
-        "r8b",
-        "r9b",
-        "r10b",
-        "r11b",
-        "r12b",
-        "r13b",
-        "r14b",
-        "r15b"
-    };
-
-    char const *const register_names_word[RegisterCount] = {
-        "ax",
-        "bx",
-        "cx",
-        "dx",
-        "si",
-        "di",
-        "sp",
-        "bp",
-        "r8d",
-        "r9d",
-        "r10w",
-        "r11w",
-        "r12w",
-        "r13w",
-        "r14w",
-        "r15w"
-    };
-
-    char const *const register_names_dword[RegisterCount] = {
-        "eax",
-        "ebx",
-        "ecx",
-        "edx",
-        "esi",
-        "edi",
-        "esp",
-        "ebp",
-        "r8d",
-        "r9d",
-        "r10d",
-        "r11d",
-        "r12d",
-        "r13d",
-        "r14d",
-        "r15d"
-    };
-
-    char const *const register_names_qword[RegisterCount] = {
-        "rax",
-        "rbx",
-        "rcx",
-        "rdx",
-        "rsi",
-        "rdi",
-        "rsp",
-        "rbp",
-        "r8",
-        "r9",
-        "r10",
-        "r11",
-        "r12",
-        "r13",
-        "r14",
-        "r15"
-    };
-
-    switch (word_kind) {
-        case Byte: 
-            return register_names_byte[reg];
-        case Word: 
-            return register_names_word[reg];
-        case DWord: 
-            return register_names_dword[reg];
-        case QWord: 
-            return register_names_qword[reg];
-        default: 
-            return "unknown word_kind";
-    }
-}
-
-static struct Location location_register(
-    enum Register const reg,
-    enum WordKind const word_kind
-) {
-    return (struct Location) {
-        .kind = LocationRegister,
-        .reg = reg,
-        .word_kind = word_kind,
-    };
-}
-
-static struct Location location_stack(
-    usize const stack_offset,
-    enum WordKind const word_kind
-) {
-    return (struct Location) {
-        .kind = LocationStack,
-        .stack_offset = stack_offset,
-        .word_kind = word_kind,
-    };
-}
-
-static void write_location(
-    struct Writer *const assembly_writer,
-    struct Location const location
-) {
-    switch (location.kind) {
-        case LocationStack:
-            writer_writef(
-                assembly_writer, 
-                "%s [rbp-%zu]",
-                word_kind_name(location.word_kind),
-                location.stack_offset
-            );
-            break;
-
-        case LocationRegister:
-            writer_write(
-                assembly_writer,
-                register_name(location.reg, location.word_kind)
-            );
-            break;
-    }
-}
-
-static void write_location_or_integer(
-    struct Writer *const assembly_writer,
-    struct LocationOrInteger const location_or_integer
-) {
-    if (location_or_integer.is_integer) {
-        writer_writef(assembly_writer, "%zu", location_or_integer.integer);
+    if (value == floor) {
+        return value;
     } else {
-        write_location(assembly_writer, location_or_integer.location);
+        return floor + round;
     }
 }
 
-static void write_mov(
-    struct Writer *const assembly_writer,
-    struct Location const dst,
-    struct LocationOrInteger const src 
-) {
-    writer_write(assembly_writer, "\tmov ");
-    write_location(assembly_writer, dst);
-    writer_write(assembly_writer, ", ");
-    write_location_or_integer(assembly_writer, src);
-    writer_write(assembly_writer, "\n");
-}
-
-static struct VariableDescription *variable_table_get(
-    struct VariableTable const *const self,
-    struct CharSlice const name
-) {
-    usize const *const index = map__charslice_usize__get(&self->variable_index, name);
-
-    if (index == NULL) { 
-        return NULL;
-    }
-
-    return &self->variable_descriptions[*index];
-}
-
-static struct CompileResult compile_ok(void) {
-    return (struct CompileResult) {
-        .ok = true,
-    };
-}
-
-struct CompileResult compile_root(
-    struct Writer *assembly_writer, 
-    struct AstRoot const *ast
-) {
-    struct CompileResult result = compile_ok();
-
-    struct VariableTable variable_table;
-    variable_table_init(&variable_table);
-
-    writer_write(assembly_writer, "global main\n");
-
-    writer_write(assembly_writer, "section .text\n");
-
-    // main function
-    writer_write(assembly_writer, "main:\n");
-    writer_write(assembly_writer, "\tpush rbp\n");
-    writer_write(assembly_writer, "\tmov rbp, rsp\n");
-
-    // temp: reserve fixed stack amount
-    writer_write(assembly_writer, "\tsub rsp, 64\n");
-
-    usize stack_offset = 0u;
-
-    for (
-        usize statement_index = 0u; 
-        statement_index < ast->block.statement_count; 
-        statement_index += 1
-    ) {
-        struct AstStatement const statement = ast->block.statements[statement_index];
-        struct LocationOrInteger expression_value;
-        struct Type expression_type;
-
-        switch (statement.kind) {
-            case AstStatementExpression: {
-                compile_expression(
-                    assembly_writer, 
-                    &statement.expression, 
-                    &variable_table,
-                    &expression_value,
-                    &expression_type
-                );
-                break;
-            }
-            case AstStatementReturn: {
-                compile_expression(
-                    assembly_writer, 
-                    &statement.return_statement.expression, 
-                    &variable_table,
-                    &expression_value,
-                    &expression_type
-                );
-                write_mov(
-                    assembly_writer,
-                    location_register(RegisterA, DWord), 
-                    expression_value
-                );
-                writer_write(
-                    assembly_writer, 
-                    "\tleave\n"
-                );
-                writer_write(
-                    assembly_writer, 
-                    "\tret\n"
-                );
-
-                goto End;
-            }
-            case AstStatementVariableDeclaration: {
-                stack_offset += 4u;
-
-                struct VariableDescription const variable_description = 
-                    (struct VariableDescription) {
-                        .name = statement.variable_declaration.identifier.name,
-                        .stack_offset = stack_offset,
-                    };
-
-                variable_table_insert(
-                    &variable_table, 
-                    variable_description
-                );
-
-                if (statement.variable_declaration.has_assigned_expression) {
-                    compile_expression(
-                        assembly_writer, 
-                        &statement.variable_declaration.assigned_expression, 
-                        &variable_table,
-                        &expression_value,
-                        &expression_type
-                    );
-                    write_mov(
-                        assembly_writer,
-                        location_stack(variable_description.stack_offset, DWord), 
-                        expression_value
-                    );
-                }
-
-                break;
-            }
+static struct Type get_type(struct AstType ast_type) {
+    switch (ast_type.kind) {
+        case AstTypeIntS32: {
+            return (struct Type) {
+                .kind = TypeKindIntSigned32,
+            };
         }
     }
 
-End:
-    variable_table_free(&variable_table);
-    return compile_ok();
+    log_error("unknown type kind %zu", (usize) ast_type.kind);
+    exit(1);
+} 
+
+static void make_stack_space_for_variable(
+    struct CompileContext *const context,
+    usize const size_bytes
+) {
+    context->stack_offset += size_bytes;
+    context->stack_offset_temporary += size_bytes;
+    context->stack_offset_max = max_usize(context->stack_offset, context->stack_offset_max);
 }
 
-struct CompileResult compile_expression(
-    struct Writer *assembly_writer, 
-    struct AstExpression const *expression,
-    struct VariableTable const *const variable_table,
-    struct LocationOrInteger *const expression_value_out,
-    struct Type *const expression_type_out
+static void make_stack_space_for_temporary(
+    struct CompileContext *const context,
+    usize const size_bytes
 ) {
-    switch (expression->kind) {
-        case AstExpressionConstant:
-            return compile_constant(
-                assembly_writer, 
-                &expression->constant, 
-                variable_table, 
-                expression_value_out,
-                expression_type_out
-            );
-        case AstExpressionIdentifier:
-            return compile_identifier(
-                assembly_writer, 
-                &expression->identifier, 
-                variable_table, 
-                expression_value_out,
-                expression_type_out
-            );
-        default:
-            printf("don't know how to compile ");
-            struct Writer stdout_writer = file_writer(stdout);
-            ast_debug_expression(&stdout_writer, expression);
-            break;
+    context->stack_offset_temporary += size_bytes;
+    context->stack_offset_max = max_usize(
+        context->stack_offset_temporary, 
+        context->stack_offset_max
+    );
+}
+
+static struct VariableDescription try_declare_variable(
+    struct CompileContext *const context,
+    struct CharSlice const name,
+    struct Type const type
+) {
+    if (variable_table_has(context->variable_table, name)) {
+        char *const name_cstr = charslice_as_cstr(name);
+        compile_error("redeclaration of variable %s", name_cstr);
+        free(name_cstr);
+    } 
+
+    usize const size = type_size_bytes(type);
+    make_stack_space_for_variable(context, size);
+
+    struct VariableDescription const variable_desc = (struct VariableDescription) {
+        .name = name,
+        .type = type,
+        .stack_offset = context->stack_offset,
+    };
+
+    variable_table_insert(context->variable_table, variable_desc);
+    return variable_desc;
+}
+
+void compile_root(
+    struct Writer *const assembly_writer, 
+    struct AstRoot const *ast
+) {
+    struct VariableTable variable_table;
+    variable_table_init(&variable_table, NULL);
+
+    struct CompileContext context = {
+        .variable_table = &variable_table,
+        .last_expression_value = { .has_value = false },
+        .stack_offset = 0u,
+        .stack_offset_max = 0u,
+        .stack_offset_temporary = 0u,
+    };
+
+    writer_write(assembly_writer, "global main\n");
+    writer_write(assembly_writer, "section .text\n");
+
+    // main block
+
+    struct CharVec body_instructions;
+    charvec_init(&body_instructions);
+    struct Writer body_writer = charvec_writer(&body_instructions);
+
+    compile_block(&body_writer, &ast->block, &context);
+
+    variable_table_free(&variable_table);
+
+    writer_write(assembly_writer, "main:\n");
+    write_instruction(
+        assembly_writer, 
+        InstructionPush, 
+        1u, 
+        operand_register(QWord, RegisterBP)
+    );
+    write_instruction(
+        assembly_writer, 
+        InstructionMov, 
+        2u, 
+        operand_register(QWord, RegisterBP),
+        operand_register(QWord, RegisterSP)
+    );
+    write_instruction(
+        assembly_writer,
+        InstructionSub,
+        2u,
+        operand_register(QWord, RegisterSP),
+        operand_immediate(QWord, round_up_usize(context.stack_offset_max, 16u))
+    );
+    writer_write_charslice(
+        assembly_writer, 
+        charvec_slice_whole(&body_instructions)
+    );
+}
+
+void compile_block(
+    struct Writer *const assembly_writer, 
+    struct AstBlock const *const block,
+    struct CompileContext *const context
+) {
+    for (
+        usize statement_index = 0u; 
+        statement_index < block->statement_count; 
+        statement_index += 1
+    ) {
+        struct AstStatement const *const statement = &block->statements[statement_index];
+        compile_statement(assembly_writer, statement, context);
     }
 }
 
-struct CompileResult compile_identifier(
-    struct Writer *assembly_writer, 
-    struct AstIdentifier const *identifier,
-    struct VariableTable const *const variable_table,
-    struct LocationOrInteger *const expression_value_out,
-    struct Type *const expression_type_out
+void compile_statement(
+    struct Writer *const assembly_writer, 
+    struct AstStatement const *const statement,
+    struct CompileContext *const context
 ) {
-    struct VariableDescription const *const variable_description = variable_table_get(
-        variable_table, 
-        identifier->name
-    );
+    context->stack_offset_temporary = context->stack_offset;
 
-    *expression_value_out = (struct LocationOrInteger) {
-        .is_integer = false,
-        .location = location_stack(variable_description->stack_offset, DWord),
-    };
+    switch (statement->kind) {
+        case AstStatementExpression: {
+            compile_expression(
+                assembly_writer, 
+                &statement->expression, 
+                context
+            );
+            break;
+        }
+        case AstStatementVariableDeclaration: {
+            struct VariableDescription const variable_desc = try_declare_variable(
+                context, 
+                statement->variable_declaration.identifier.name,
+                get_type(statement->variable_declaration.type)
+            );
 
-    return compile_ok();
+            if (statement->variable_declaration.has_assigned_expression) {
+                compile_expression(
+                    assembly_writer, 
+                    &statement->variable_declaration.assigned_expression, 
+                    context
+                );
+
+                write_instruction(
+                    assembly_writer, 
+                    InstructionMov, 
+                    2u, 
+                    operand_stack(DWord, variable_desc.stack_offset),
+                    context->last_expression_value.operand
+                );
+            }
+            break;
+        }
+        case AstStatementReturn: {
+            if (statement->return_statement.has_returned_expression) {
+                compile_expression(
+                    assembly_writer, 
+                    &statement->return_statement.returned_expression, 
+                    context
+                );
+                write_instruction(
+                        assembly_writer,
+                        InstructionMov,
+                        2u,
+                        operand_register(DWord, RegisterA),
+                        context->last_expression_value.operand
+                );
+            }
+            write_instruction(
+                assembly_writer,
+                InstructionLeave,
+                0u
+            );
+            write_instruction(
+                assembly_writer,
+                InstructionRet,
+                0u
+            );
+            break;
+        }
+        default: {
+            struct CharVec msg;
+            charvec_init(&msg);
+            struct Writer msg_writer = charvec_writer(&msg);
+            writer_write(&msg_writer, "don't know how to compile ");
+            ast_debug_statement(&msg_writer, statement);
+            char *const msg_cstr = charslice_as_cstr(charvec_slice_whole(&msg));
+            log_error("%s", msg_cstr);
+            free(msg_cstr);
+            exit(1);
+            break;
+        }
+    }
 }
 
-struct CompileResult compile_constant(
-    struct Writer *assembly_writer, 
-    struct AstConstant const *constant,
-    struct VariableTable const *const variable_table,
-    struct LocationOrInteger *const expression_value_out,
-    struct Type *const expression_type_out
+void compile_expression(
+    struct Writer *const assembly_writer, 
+    struct AstExpression const *const expression,
+    struct CompileContext *const context
 ) {
-    *expression_value_out = (struct LocationOrInteger) {
-        .is_integer = true,
-        .integer = constant->value,
-    };
+    context->last_expression_value.has_value = false;
 
-    return compile_ok();
+    switch (expression->kind) {
+        case AstExpressionIdentifier: {
+            compile_identifier(assembly_writer, &expression->identifier, context);
+            break;
+        }
+        case AstExpressionConstant: {
+            compile_constant(assembly_writer, &expression->constant, context);
+            break;
+        }
+        case AstExpressionBinaryOp: {
+            compile_binary_op(assembly_writer, &expression->binary_op, context);
+            break;
+        }
+        default: {
+            struct CharVec msg;
+            charvec_init(&msg);
+            struct Writer msg_writer = charvec_writer(&msg);
+            writer_write(&msg_writer, "don't know how to compile ");
+            ast_debug_expression(&msg_writer, expression);
+            char *const msg_cstr = charslice_as_cstr(charvec_slice_whole(&msg));
+            log_error("%s", msg_cstr);
+            free(msg_cstr);
+            exit(1);
+            break;
+        }
+    }
+}
+
+void compile_identifier(
+    struct Writer *const assembly_writer, 
+    struct AstIdentifier const *const identifier,
+    struct CompileContext *const context
+) {
+    struct VariableDescription variable_desc;
+    if (!variable_table_lookup(context->variable_table, identifier->name, &variable_desc)) {
+        char *const name_cstr = charslice_as_cstr(identifier->name);
+        compile_error("undeclared identifier: %s", name_cstr);
+        free(name_cstr);
+    }
+
+    context->last_expression_value.has_value = true;
+    context->last_expression_value.operand = operand_stack(DWord, variable_desc.stack_offset);
+    context->last_expression_value.type = variable_desc.type;
+}
+
+void compile_constant(
+    struct Writer *const assembly_writer, 
+    struct AstConstant const *const constant,
+    struct CompileContext *const context
+) {
+    context->last_expression_value.has_value = true;
+    context->last_expression_value.operand = operand_immediate(DWord, constant->value);
+    context->last_expression_value.type = (struct Type) { .kind = TypeKindIntSigned32 };
+}
+
+void compile_binary_op(
+    struct Writer *const assembly_writer, 
+    struct AstBinaryOp const *const op,
+    struct CompileContext *const context
+) {
+    compile_expression(assembly_writer, op->left, context);
+    struct ExpressionValue left_value = context->last_expression_value;
+    
+    // if result is stored in a register, copy it to a temporary
+    if (left_value.operand.kind == OperandRegister) {
+        make_stack_space_for_temporary(context, 4u);
+        struct Operand const new_operand = operand_stack(DWord, context->stack_offset_temporary);
+        write_instruction(
+            assembly_writer, 
+            InstructionMov, 
+            2u, 
+            new_operand,
+            left_value.operand
+        );
+        left_value.operand = new_operand;
+    }
+
+    compile_expression(assembly_writer, op->right, context);
+    struct ExpressionValue right_value = context->last_expression_value;
+
+    // if result is stored in a register, copy it to a temporary
+    if (right_value.operand.kind == OperandRegister) {
+        make_stack_space_for_temporary(context, 4u);
+        struct Operand const new_operand = operand_stack(DWord, context->stack_offset_temporary);
+        write_instruction(
+            assembly_writer, 
+            InstructionMov, 
+            2u, 
+            new_operand,
+            right_value.operand
+        );
+        right_value.operand = new_operand;
+    }
+
+    switch (op->kind) {
+        case AstBinaryOpAssignment: {
+            bool can_assign_directly = right_value.operand.kind == OperandRegister 
+                || right_value.operand.kind == OperandImmediate;
+
+            if (can_assign_directly) {
+                write_instruction(
+                    assembly_writer, 
+                    InstructionMov, 
+                    2u, 
+                    left_value.operand,
+                    right_value.operand
+                );
+            } else {
+                write_instruction(
+                    assembly_writer, 
+                    InstructionMov, 
+                    2u, 
+                    operand_register(DWord, RegisterA),
+                    right_value.operand
+                );
+                write_instruction(
+                    assembly_writer, 
+                    InstructionMov, 
+                    2u, 
+                    left_value.operand,
+                    operand_register(DWord, RegisterA)
+                );
+            }
+            context->last_expression_value = left_value;
+            break;
+        }
+        case AstBinaryOpAddition: {
+            write_instruction(
+                assembly_writer, 
+                InstructionMov, 
+                2u, 
+                operand_register(DWord, RegisterA),
+                left_value.operand
+            );
+            write_instruction(
+                assembly_writer, 
+                InstructionMov, 
+                2u, 
+                operand_register(DWord, RegisterB),
+                right_value.operand
+            );
+            write_instruction(
+                assembly_writer, 
+                InstructionAdd, 
+                2u, 
+                operand_register(DWord, RegisterA),
+                operand_register(DWord, RegisterB)
+            );
+            context->last_expression_value = (struct ExpressionValue) {
+                .operand = operand_register(DWord, RegisterA),
+                .type = (struct Type) { .kind = TypeKindIntSigned32 }
+            };
+            break;
+        }
+        default: {
+            struct CharVec msg;
+            charvec_init(&msg);
+            struct Writer msg_writer = charvec_writer(&msg);
+            writer_write(&msg_writer, "don't know how to compile ");
+            ast_debug_binary_op(&msg_writer, op);
+            char *const msg_cstr = charslice_as_cstr(charvec_slice_whole(&msg));
+            log_error("%s", msg_cstr);
+            free(msg_cstr);
+            exit(1);
+            break;
+        }
+    }
 }
