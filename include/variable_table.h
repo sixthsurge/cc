@@ -27,10 +27,10 @@ struct VariableDescription {
 
 struct VariableTable {
     struct Map__CharSlice_VariableDescription variable_index; 
-    struct VariableTable const *parent;
+    struct VariableTable *parent;
 };
 
-void variable_table_init(struct VariableTable *self, struct VariableTable const *parent);
+void variable_table_init(struct VariableTable *self, struct VariableTable *parent);
 void variable_table_free(struct VariableTable *self);
 void variable_table_insert(struct VariableTable *self, struct VariableDescription variable_desc);
 bool variable_table_has(struct VariableTable const *self, struct CharSlice name);

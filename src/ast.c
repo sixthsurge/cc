@@ -3,7 +3,6 @@
 #include "writer.h"
 
 void ast_debug_root(struct Writer *writer, struct AstRoot const *self) {
-/*
     writer_write(writer, "Root(items = [");
     for (usize i = 0; i < self->item_count; ++i) {
         ast_debug_top_level_item(writer, &self->items[i]);
@@ -13,9 +12,6 @@ void ast_debug_root(struct Writer *writer, struct AstRoot const *self) {
         }
     }
     writer_write(writer, "])");
-*/
-
-    ast_debug_block(writer, &self->block);
 }
 
 void ast_debug_top_level_item(struct Writer *writer, struct AstTopLevelItem const *self) {
@@ -64,7 +60,11 @@ void ast_debug_function_parameter(struct Writer *writer, struct AstFunctionParam
     writer_write(writer, "FunctionParameter(");
 
     writer_write(writer, "identifier = ");
-    ast_debug_identifier(writer, &self->identifier);
+    if (self->has_identifier) {
+        ast_debug_identifier(writer, &self->identifier);
+    } else {
+        writer_write(writer, "None");
+    }
 
     writer_write(writer, ", type = ");
     ast_debug_type(writer, &self->type);
@@ -110,9 +110,11 @@ void ast_debug_variable_declaration(struct Writer *writer, struct AstVariableDec
     writer_write(writer, ", type = ");
     ast_debug_type(writer, &self->type);
 
+    writer_write(writer, ", assigned_expression = ");
     if (self->has_assigned_expression) {
-        writer_write(writer, ", assigned_expression = ");
         ast_debug_expression(writer, &self->assigned_expression);
+    } else {
+        writer_write(writer, "None");
     }
 
     writer_write(writer, ")");
@@ -120,9 +122,11 @@ void ast_debug_variable_declaration(struct Writer *writer, struct AstVariableDec
 
 void ast_debug_return(struct Writer *writer, struct AstReturn const *self) {
     writer_write(writer, "Return(");
+    writer_write(writer, "returned_expression = ");
     if (self->has_returned_expression) {
-        writer_write(writer, "returned_expression = ");
         ast_debug_expression(writer, &self->returned_expression);
+    } else {
+        writer_write(writer, "None");
     }
     writer_write(writer, ")");
 }
@@ -135,6 +139,10 @@ void ast_debug_expression(struct Writer *writer, struct AstExpression const *sel
         }
         case AstExpressionConstant: {
             ast_debug_constant(writer, &self->constant);
+            break;
+        }
+        case AstExpressionAssignment: {
+            ast_debug_assignment(writer, &self->assignment);
             break;
         }
         case AstExpressionCall: {
@@ -150,6 +158,20 @@ void ast_debug_expression(struct Writer *writer, struct AstExpression const *sel
             break;
         }
     }
+}
+
+void ast_debug_assignment(struct Writer *writer, struct AstAssignment const *self) {
+    writer_write(writer, "Assignment(");
+    writer_write(writer, "assignee = ");
+    ast_debug_assignee(writer, &self->assignee);
+    writer_write(writer, ", ");
+    writer_write(writer, "assigned_expression = ");
+    ast_debug_expression(writer, self->assigned_expression);
+    writer_write(writer, ")");
+}
+
+void ast_debug_assignee(struct Writer *writer, struct AstAssignee const *self) {
+    ast_debug_identifier(writer, &self->identifier);
 }
 
 void ast_debug_unary_op(struct Writer *writer, struct AstUnaryOp const *self) {
@@ -174,10 +196,6 @@ void ast_debug_binary_op(struct Writer *writer, struct AstBinaryOp const *self) 
 
     writer_write(writer, "kind = ");
     switch (self->kind) {
-        case AstBinaryOpAssignment: { 
-            writer_write(writer, "Assignment");
-            break;
-        }
         case AstBinaryOpAddition: { 
             writer_write(writer, "Addition");
             break;

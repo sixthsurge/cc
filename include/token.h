@@ -17,6 +17,7 @@ enum TokenKind {
     TokenRightBrace,
     TokenLeftBracket,
     TokenRightBracket,
+    TokenComma,
 
     // Operators
     TokenOperatorAssignment,

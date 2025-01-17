@@ -19,7 +19,7 @@
 
 void variable_table_init(
     struct VariableTable *const self, 
-    struct VariableTable const *const parent
+    struct VariableTable *const parent
 ) {
     map__charslice_variabledescription__init(&self->variable_index, VARIABLE_TABLE_INDEX_SIZE);
     self->parent = parent;

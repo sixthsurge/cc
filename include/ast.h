@@ -10,7 +10,6 @@ enum AstUnaryOpKind {
 };
 
 enum AstBinaryOpKind {
-    AstBinaryOpAssignment,
     AstBinaryOpAddition,
     AstBinaryOpSubtraction,
     AstBinaryOpMultiplication,
@@ -24,6 +23,7 @@ enum AstTypeKind {
 enum AstExpressionKind {
     AstExpressionIdentifier,
     AstExpressionConstant,
+    AstExpressionAssignment,
     AstExpressionCall,
     AstExpressionUnaryOp,
     AstExpressionBinaryOp,
@@ -48,6 +48,15 @@ struct AstType {
 
 struct AstIdentifier {
     struct CharSlice name;
+};
+
+struct AstAssignee {
+    struct AstIdentifier identifier;
+};
+
+struct AstAssignment {
+    struct AstAssignee assignee;
+    struct AstExpression const *assigned_expression;
 };
 
 struct AstConstant {
@@ -77,6 +86,7 @@ struct AstExpression {
     union {
         struct AstIdentifier identifier;
         struct AstConstant constant;
+        struct AstAssignment assignment;
         struct AstCall call;
         struct AstUnaryOp unary_op;
         struct AstBinaryOp binary_op;
@@ -111,6 +121,7 @@ struct AstBlock {
 };
 
 struct AstFunctionParameter {
+    bool has_identifier;
     struct AstIdentifier identifier;
     struct AstType type;
 };
@@ -136,9 +147,8 @@ struct AstTopLevelItem {
 };
 
 struct AstRoot {
-    //struct AstTopLevelItem const *items;
-    //usize item_count;
-    struct AstBlock block;
+    struct AstTopLevelItem const *items;
+    usize item_count;
 };
 
 void ast_debug_root(struct Writer *writer, struct AstRoot const *self);
@@ -151,6 +161,8 @@ void ast_debug_statement(struct Writer *writer, struct AstStatement const *self)
 void ast_debug_variable_declaration(struct Writer *writer, struct AstVariableDeclaration const *self);
 void ast_debug_return(struct Writer *writer, struct AstReturn const *self);
 void ast_debug_expression(struct Writer *writer, struct AstExpression const *self);
+void ast_debug_assignment(struct Writer *writer, struct AstAssignment const *self);
+void ast_debug_assignee(struct Writer *writer, struct AstAssignee const *self);
 void ast_debug_unary_op(struct Writer *writer, struct AstUnaryOp const *self);
 void ast_debug_binary_op(struct Writer *writer, struct AstBinaryOp const *self);
 void ast_debug_call(struct Writer *writer, struct AstCall const *self);

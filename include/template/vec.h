@@ -25,6 +25,7 @@ void                     VEC_PREFIX(clone)             (struct VEC_TYPE *self, s
 void                     VEC_PREFIX(init_from_slice)   (struct VEC_TYPE *self, struct VEC_SLICE_TYPE slice);
 void                     VEC_PREFIX(free)              (struct VEC_TYPE *self);
 VEC_ELEMENT_TYPE        *VEC_PREFIX(at)                (struct VEC_TYPE const *self, usize index);
+VEC_ELEMENT_TYPE        *VEC_PREFIX(peek_back)         (struct VEC_TYPE const *self);
 struct VEC_SLICE_TYPE    VEC_PREFIX(slice)             (struct VEC_TYPE const *self, usize begin, usize end);
 struct VEC_SLICE_TYPE    VEC_PREFIX(slice_whole)       (struct VEC_TYPE const *self);
 void                     VEC_PREFIX(resize)            (struct VEC_TYPE *self, usize new_capacity);
@@ -35,6 +36,7 @@ void                     VEC_PREFIX(insert)            (struct VEC_TYPE *self, u
 void                     VEC_PREFIX(insert_slice)      (struct VEC_TYPE *self, usize index, struct VEC_SLICE_TYPE slice);
 void                     VEC_PREFIX(remove_at)         (struct VEC_TYPE *self, usize index);
 void                     VEC_PREFIX(remove_range)      (struct VEC_TYPE *self, usize begin, usize end);
+VEC_ELEMENT_TYPE         VEC_PREFIX(pop_back)          (struct VEC_TYPE *self);
 void                     VEC_PREFIX(clear)             (struct VEC_TYPE *self);
 
 #ifdef VEC_DEBUG_FN

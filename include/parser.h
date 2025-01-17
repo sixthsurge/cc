@@ -3,31 +3,27 @@
 #include "arena.h"
 #include "ast.h"
 #include "token.h"
+#include "writer.h"
 
 enum ParseErrorKind {
-    ParseErrorUnexpectedToken,
-    ParseErrorExpectedPrimaryExpression,
-};
-
-struct Parser {
-    struct TokenSlice tokens;
-    struct Token last_token;
-    struct Arena *ast_arena;
+    ParseErrorUnknown,
+    ParseErrorJoin,          // {ParseError} or {ParseError}
+    ParseErrorExpectedToken, // expected {TokenKind}, got {TokenKind}
 };
 
 struct ParseError {
     enum ParseErrorKind kind;
-    struct TokenPosition position;
 
     union {
         struct {
-            enum TokenKind found;
-            enum TokenKind const *expected;
-            usize expected_count;
-        } unexpected_token;
+            struct ParseError const *left;
+            struct ParseError const *right;
+        } join;
         struct {
-            char const *required;
-        } required_item;
+            struct TokenPosition position;
+            enum TokenKind expected;
+            enum TokenKind got;
+        } expected_token;
     };
 };
 
@@ -36,17 +32,6 @@ struct ParseResult {
     struct ParseError error;
 };
 
-void parser_init(struct Parser *self, struct Arena *ast_arena, struct TokenSlice tokens);
-
-struct ParseResult parse_root(struct AstRoot *out, struct Parser *parser);
-struct ParseResult parse_block(struct AstBlock *out, struct Parser *parser);
-struct ParseResult parse_statement(struct AstStatement *out, struct Parser *parser);
-struct ParseResult parse_variable_declaration(struct AstVariableDeclaration *out, struct Parser *parser);
-struct ParseResult parse_return(struct AstReturn *out, struct Parser *parser);
-struct ParseResult parse_expression(struct AstExpression *out, struct Parser *parser);
-struct ParseResult parse_assignment_expression(struct AstExpression *out, struct Parser *parser);
-struct ParseResult parse_additive_expression(struct AstExpression *out, struct Parser *parser);
-struct ParseResult parse_multiplicative_expression(struct AstExpression *out, struct Parser *parser);
-struct ParseResult parse_primary_expression(struct AstExpression *out, struct Parser *parser);
-
+struct ParseResult parse(struct AstRoot *out, struct TokenSlice tokens, struct Arena *ast_arena);
 void parse_error_debug(struct Writer *writer, struct ParseError const *error);
+

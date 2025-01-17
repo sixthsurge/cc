@@ -116,6 +116,10 @@ static struct Token lexer_next_token(struct Lexer *const self) {
             token.kind = TokenRightBracket;
             break;
         }
+        case ',': {
+            token.kind = TokenComma;
+            break;
+        }
         case '=': {
             char c_next = lexer_peek_char(self);
 

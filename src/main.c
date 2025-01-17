@@ -44,15 +44,16 @@ i32 main(void) {
     struct Arena ast_arena;
     arena_init(&ast_arena, ARENA_BLOCK_LEN);
 
-    struct Parser parser;
-    parser_init(&parser, &ast_arena, tokenvec_slice_whole(&tokens));
-
     struct AstRoot ast;
-    struct ParseResult const result = parse_root(&ast, &parser);
+    struct ParseResult const parse_result = parse(
+        &ast, 
+        tokenvec_slice_whole(&tokens),
+        &ast_arena
+    );
 
-    if (!result.ok) {
-        log_error("parsing error %zu:%zu", result.error.position.line, result.error.position.character);
-        parse_error_debug(&stdout_writer, &result.error);
+    if (!parse_result.ok) {
+        log_error("parsing error");
+        parse_error_debug(&stdout_writer, &parse_result.error);
         return 1;
     }
 

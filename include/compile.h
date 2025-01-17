@@ -15,6 +15,18 @@ void compile_root(
     struct AstRoot const *root
 );
 
+void compile_top_level_item(
+    struct Writer *assembly_writer, 
+    struct AstTopLevelItem const *top_level_item,
+    struct CompileContext *context
+);
+
+void compile_function_definition(
+    struct Writer *assembly_writer, 
+    struct AstFunctionDefinition const *function_definition,
+    struct CompileContext *context
+);
+
 void compile_block(
     struct Writer *assembly_writer, 
     struct AstBlock const *block,
@@ -42,6 +54,12 @@ void compile_identifier(
 void compile_constant(
     struct Writer *assembly_writer, 
     struct AstConstant const *constant,
+    struct CompileContext *context
+);
+
+void compile_assignment(
+    struct Writer *assembly_writer, 
+    struct AstAssignment const *assignment,
     struct CompileContext *context
 );
 

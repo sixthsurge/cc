@@ -56,6 +56,15 @@ VEC_ELEMENT_TYPE *VEC_PREFIX(at)(struct VEC_TYPE const *const self, usize const 
     }
 }
 
+VEC_ELEMENT_TYPE *VEC_PREFIX(peek_back)(struct VEC_TYPE const *const self) {
+    if (self->len > 0u) {
+        return &self->data[self->len - 1u];
+    } else {
+        log_error("vec_peek_back: vec is empty");
+        exit(1);
+    }
+}
+
 struct VEC_SLICE_TYPE VEC_PREFIX(slice)(struct VEC_TYPE const *const self, usize const begin, usize const end) {
     if (begin > end) {
         log_error("vec_slice: begin > end (begin = %zu, end = %zu)", begin, end);
@@ -153,7 +162,17 @@ void VEC_PREFIX(remove_at)(struct VEC_TYPE *const self, usize const index) {
     }
 
     memmove(self->data + index, self->data + index + 1, (self->len - index) * sizeof (VEC_ELEMENT_TYPE));
-    self->len -= 1;
+    self->len -= 1u;
+}
+
+VEC_ELEMENT_TYPE VEC_PREFIX(pop_back)(struct VEC_TYPE *const self) {
+    if (self->len > 0u) {
+        self->len -= 1u;
+        return self->data[self->len];
+    } else {
+        log_error("vec_pop_back: vec is empty");
+        exit(1);
+    }
 }
 
 void VEC_PREFIX(remove_range)(struct VEC_TYPE *const self, usize begin, usize end) {

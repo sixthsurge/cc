@@ -15,6 +15,7 @@ void token_kind_debug(struct Writer *writer, enum TokenKind const *kind) {
         "}",
         "[",
         "]",
+        ",",
         // operators
         "=",
         "==",

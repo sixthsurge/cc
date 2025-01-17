@@ -108,11 +108,11 @@ void compile_root(
     struct Writer *const assembly_writer, 
     struct AstRoot const *ast
 ) {
-    struct VariableTable variable_table;
-    variable_table_init(&variable_table, NULL);
+    struct VariableTable global_variable_table;
+    variable_table_init(&global_variable_table, NULL);
 
     struct CompileContext context = {
-        .variable_table = &variable_table,
+        .variable_table = &global_variable_table,
         .last_expression_value = { .has_value = false },
         .stack_offset = 0u,
         .stack_offset_max = 0u,
@@ -122,17 +122,70 @@ void compile_root(
     writer_write(assembly_writer, "global main\n");
     writer_write(assembly_writer, "section .text\n");
 
-    // main block
+    for (usize item_index = 0u; item_index < ast->item_count; item_index += 1u) {
+        compile_top_level_item(
+            assembly_writer, 
+            &ast->items[item_index], 
+            &context
+        );
+    }
 
+    variable_table_free(&global_variable_table);
+}
+
+void compile_top_level_item(
+    struct Writer *const assembly_writer, 
+    struct AstTopLevelItem const *const item,
+    struct CompileContext *const context
+) {
+    switch (item->kind) {
+        case AstTopLevelItemFunctionDefinition: {
+            compile_function_definition(
+                assembly_writer, 
+                &item->function_definition, 
+                context
+            );
+            break;
+        }
+        default: {
+            struct CharVec msg;
+            charvec_init(&msg);
+            struct Writer msg_writer = charvec_writer(&msg);
+            writer_write(&msg_writer, "don't know how to compile ");
+            ast_debug_top_level_item(&msg_writer, item);
+            char *const msg_cstr = charslice_as_cstr(charvec_slice_whole(&msg));
+            log_error("%s", msg_cstr);
+            free(msg_cstr);
+            exit(1);
+            break;
+        }
+    }
+}
+
+void compile_function_definition(
+    struct Writer *const assembly_writer, 
+    struct AstFunctionDefinition const *const function_definition,
+    struct CompileContext *const context
+) {
+    // compile body
     struct CharVec body_instructions;
     charvec_init(&body_instructions);
     struct Writer body_writer = charvec_writer(&body_instructions);
 
-    compile_block(&body_writer, &ast->block, &context);
+    context->stack_offset = 0u;
+    context->stack_offset_max = 0u;
+    context->stack_offset_temporary = 0u;
+    compile_block(
+        &body_writer, 
+        &function_definition->body, 
+        context
+    );
 
-    variable_table_free(&variable_table);
+    // write label
+    writer_write_charslice(assembly_writer, function_definition->signature.identifier.name);
+    writer_write(assembly_writer, ":\n");
 
-    writer_write(assembly_writer, "main:\n");
+    // setup stack
     write_instruction(
         assembly_writer, 
         InstructionPush, 
@@ -151,12 +204,16 @@ void compile_root(
         InstructionSub,
         2u,
         operand_register(QWord, RegisterSP),
-        operand_immediate(QWord, round_up_usize(context.stack_offset_max, 16u))
+        operand_immediate(QWord, round_up_usize(context->stack_offset_max, 16u))
     );
+
+    // body instructions
     writer_write_charslice(
         assembly_writer, 
         charvec_slice_whole(&body_instructions)
     );
+
+    charvec_free(&body_instructions);
 }
 
 void compile_block(
@@ -164,6 +221,11 @@ void compile_block(
     struct AstBlock const *const block,
     struct CompileContext *const context
 ) {
+    // variable table for this scope 
+    struct VariableTable variable_table;
+    variable_table_init(&variable_table, context->variable_table);
+    context->variable_table = &variable_table;
+
     for (
         usize statement_index = 0u; 
         statement_index < block->statement_count; 
@@ -172,6 +234,10 @@ void compile_block(
         struct AstStatement const *const statement = &block->statements[statement_index];
         compile_statement(assembly_writer, statement, context);
     }
+
+    // reset variable table
+    context->variable_table = variable_table.parent;
+    variable_table_free(&variable_table);
 }
 
 void compile_statement(
@@ -272,6 +338,10 @@ void compile_expression(
             compile_constant(assembly_writer, &expression->constant, context);
             break;
         }
+        case AstExpressionAssignment: {
+            compile_assignment(assembly_writer, &expression->assignment, context);
+            break;
+        }
         case AstExpressionBinaryOp: {
             compile_binary_op(assembly_writer, &expression->binary_op, context);
             break;
@@ -318,6 +388,57 @@ void compile_constant(
     context->last_expression_value.type = (struct Type) { .kind = TypeKindIntSigned32 };
 }
 
+void compile_assignment(
+    struct Writer *const assembly_writer, 
+    struct AstAssignment const *const assignment,
+    struct CompileContext *const context
+) {
+    compile_identifier(
+        assembly_writer, 
+        &assignment->assignee.identifier, 
+        context
+    );
+    struct ExpressionValue const assignee = context->last_expression_value;
+
+    compile_expression(
+        assembly_writer,
+        assignment->assigned_expression,
+        context
+    );
+    struct ExpressionValue const assigned = context->last_expression_value;
+
+    // TODO: type checking and coercion
+    // assumes assignee and assigned are DWord and assignee is in memory
+
+    bool can_assign_directly = assigned.operand.kind == OperandRegister 
+        || assigned.operand.kind == OperandImmediate;
+
+    if (can_assign_directly) {
+        write_instruction(
+            assembly_writer, 
+            InstructionMov, 
+            2u, 
+            assignee.operand,
+            assigned.operand
+        );
+    } else {
+        write_instruction(
+            assembly_writer, 
+            InstructionMov, 
+            2u, 
+            operand_register(DWord, RegisterA),
+            assigned.operand
+        );
+        write_instruction(
+            assembly_writer, 
+            InstructionMov, 
+            2u, 
+            assignee.operand,
+            operand_register(DWord, RegisterA)
+        );
+    }
+}
+
 void compile_binary_op(
     struct Writer *const assembly_writer, 
     struct AstBinaryOp const *const op,
@@ -358,37 +479,6 @@ void compile_binary_op(
     }
 
     switch (op->kind) {
-        case AstBinaryOpAssignment: {
-            bool can_assign_directly = right_value.operand.kind == OperandRegister 
-                || right_value.operand.kind == OperandImmediate;
-
-            if (can_assign_directly) {
-                write_instruction(
-                    assembly_writer, 
-                    InstructionMov, 
-                    2u, 
-                    left_value.operand,
-                    right_value.operand
-                );
-            } else {
-                write_instruction(
-                    assembly_writer, 
-                    InstructionMov, 
-                    2u, 
-                    operand_register(DWord, RegisterA),
-                    right_value.operand
-                );
-                write_instruction(
-                    assembly_writer, 
-                    InstructionMov, 
-                    2u, 
-                    left_value.operand,
-                    operand_register(DWord, RegisterA)
-                );
-            }
-            context->last_expression_value = left_value;
-            break;
-        }
         case AstBinaryOpAddition: {
             write_instruction(
                 assembly_writer, 
