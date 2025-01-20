@@ -1,4 +1,5 @@
 #include "cc/compile/function_table.h"
+#include "cc/ast.h"
 #include "cc/compile/error.h"
 #include "cc/compile/function_signature.h"
 #include "cc/map.h"
@@ -82,7 +83,8 @@ bool function_table_get(
 struct CompileResult function_table_declare(
     struct FunctionTable *self, 
     struct CharSlice name, 
-    struct FunctionSignature const *signature
+    struct FunctionSignature const *signature,
+    struct AstNodePosition const position
 ) {
     struct FunctionDescription existing_function_desc;
 
@@ -91,6 +93,7 @@ struct CompileResult function_table_declare(
             return compile_error(
                 (struct CompileError) {
                     .kind = CompileErrorFunctionSignatureMismatch,
+                    .position = position,
                     .function_signature_mismatch = {
                         .name = name,
                     },
@@ -112,7 +115,8 @@ struct CompileResult function_table_declare(
 struct CompileResult function_table_define(
     struct FunctionTable *self, 
     struct CharSlice name, 
-    struct FunctionSignature const *signature
+    struct FunctionSignature const *signature,
+    struct AstNodePosition const position
 ) {
     struct FunctionDescription existing_function_desc;
 
@@ -121,6 +125,7 @@ struct CompileResult function_table_define(
             return compile_error(
                 (struct CompileError) {
                     .kind = CompileErrorFunctionSignatureMismatch,
+                    .position = position,
                     .function_signature_mismatch = {
                         .name = name,
                     },
@@ -130,6 +135,7 @@ struct CompileResult function_table_define(
             return compile_error(
                 (struct CompileError) {
                     .kind = CompileErrorFunctionRedefinition,
+                    .position = position,
                     .function_signature_mismatch = {
                         .name = name,
                     },

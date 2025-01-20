@@ -359,6 +359,19 @@ void emit_function_prologue(struct Writer *const assembly_writer, usize const st
     }
 }
 
+void emit_function_exit(struct Writer *assembly_writer) {
+    emit_instruction(
+        assembly_writer, 
+        InstructionLeave, 
+        0u
+    );
+    emit_instruction(
+        assembly_writer, 
+        InstructionRet, 
+        0u
+    );
+}
+
 void emit_moves(
     struct Writer *const assembly_writer, 
     struct Operand const dst, 

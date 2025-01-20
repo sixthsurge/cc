@@ -2,6 +2,7 @@
 
 #include "cc/common.h"
 #include "cc/slice.h"
+#include "cc/token.h"
 
 struct Writer;
 
@@ -42,28 +43,39 @@ enum AstTopLevelItemKind {
 struct AstExpression;
 struct AstStatement;
 
+struct AstNodePosition {
+    struct TokenPosition position_start;
+    struct TokenPosition position_end;
+};
+
 struct AstType {
+    struct AstNodePosition position;
     enum AstTypeKind kind;
 };
 
 struct AstIdentifier {
+    struct AstNodePosition position;
     struct CharSlice name;
 };
 
 struct AstAssignee {
+    struct AstNodePosition position;
     struct AstIdentifier identifier;
 };
 
 struct AstAssignment {
+    struct AstNodePosition position;
     struct AstAssignee assignee;
     struct AstExpression const *assigned_expression;
 };
 
 struct AstConstant {
+    struct AstNodePosition position;
     i32 value;
 };
 
 struct AstCall {
+    struct AstNodePosition position;
     struct AstExpression const *callee;
     struct AstExpression const *arguments;
     usize argument_count;
@@ -71,17 +83,20 @@ struct AstCall {
 
 struct AstUnaryOp {
     enum AstUnaryOpKind kind;
+    struct AstNodePosition position;
     struct AstExpression const *expression;
 };
 
 struct AstBinaryOp {
     enum AstBinaryOpKind kind;
+    struct AstNodePosition position;
     struct AstExpression const *left;
     struct AstExpression const *right;
 };
 
 struct AstExpression {
     enum AstExpressionKind kind;
+    struct AstNodePosition position;
 
     union {
         struct AstIdentifier identifier;
@@ -94,6 +109,7 @@ struct AstExpression {
 };
 
 struct AstVariableDeclaration {
+    struct AstNodePosition position;
     struct AstIdentifier identifier;
     struct AstType type;
     struct AstExpression assigned_expression;
@@ -102,11 +118,13 @@ struct AstVariableDeclaration {
 
 struct AstReturn {
     bool has_returned_expression;
+    struct AstNodePosition position;
     struct AstExpression returned_expression;
 };
 
 struct AstStatement {
     enum AstStatementKind kind;
+    struct AstNodePosition position;
 
     union {
         struct AstExpression expression;
@@ -116,17 +134,20 @@ struct AstStatement {
 };
 
 struct AstBlock {
+    struct AstNodePosition position;
     struct AstStatement const *statements;
     usize statement_count;
 };
 
 struct AstFunctionParameter {
-    bool has_identifier;
+    struct AstNodePosition position;
     struct AstIdentifier identifier;
     struct AstType type;
+    bool has_identifier;
 };
 
 struct AstFunctionSignature {
+    struct AstNodePosition position;
     struct AstIdentifier identifier;
     struct AstType return_type;
     struct AstFunctionParameter *parameters;
@@ -134,12 +155,14 @@ struct AstFunctionSignature {
 };
 
 struct AstFunctionDefinition {
+    struct AstNodePosition position;
     struct AstFunctionSignature signature;
     struct AstBlock body;
 };
 
 struct AstTopLevelItem {
     enum AstTopLevelItemKind kind;
+    struct AstNodePosition position;
 
     union {
         struct AstFunctionDefinition function_definition;

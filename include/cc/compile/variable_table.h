@@ -1,5 +1,6 @@
 #pragma once 
 
+#include "cc/ast.h"
 #include "cc/compile/error.h"
 #include "cc/slice.h"
 #include "cc/type.h"
@@ -32,7 +33,11 @@ struct VariableTable {
 
 void variable_table_init(struct VariableTable *self, struct VariableTable *parent);
 void variable_table_free(struct VariableTable *self);
-struct CompileResult variable_table_update(struct VariableTable *self, struct VariableDescription variable_desc);
+struct CompileResult variable_table_update(
+    struct VariableTable *self, 
+    struct VariableDescription variable_desc,
+    struct AstNodePosition position 
+);
 bool variable_table_has(struct VariableTable const *self, struct CharSlice name);
 bool variable_table_lookup(
     struct VariableTable const *self, 

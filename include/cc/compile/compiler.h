@@ -1,5 +1,6 @@
 #pragma once
 
+#include "cc/ast.h"
 #include "cc/common.h"
 #include "cc/compile/error.h"
 #include "cc/compile/function_table.h"
@@ -29,5 +30,6 @@ struct CompileResult compiler_declare_variable(
     struct Compiler *self, 
     struct VariableDescription *variable_desc_out, 
     struct CharSlice name, 
-    struct Type type
+    struct Type type,
+    struct AstNodePosition position
 );

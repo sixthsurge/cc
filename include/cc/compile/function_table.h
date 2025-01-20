@@ -1,5 +1,6 @@
 #pragma once
 
+#include "cc/ast.h"
 #include "cc/function_signature.h"
 #include "cc/map.h"
 #include "cc/slice.h"
@@ -49,10 +50,12 @@ bool function_table_get(
 struct CompileResult function_table_declare(
     struct FunctionTable *self, 
     struct CharSlice name, 
-    struct FunctionSignature const *signature
+    struct FunctionSignature const *signature,
+    struct AstNodePosition position
 );
 struct CompileResult function_table_define(
     struct FunctionTable *self, 
     struct CharSlice name, 
-    struct FunctionSignature const *signature
+    struct FunctionSignature const *signature,
+    struct AstNodePosition position
 );

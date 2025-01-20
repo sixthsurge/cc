@@ -8,11 +8,6 @@
 #include "cc/token.h"
 #include "cc/vec.h"
 
-#define PARSER_SUCCEED_ON(PARSER, RESULT)               \
-    if ((RESULT).ok) {                              \
-        return parser_success(PARSER);              \
-    }                                               \
-
 #define PARSER_FAIL_ON(PARSER, RESULT)                  \
     do {                                                \
         struct ParseResult const result = (RESULT);     \
@@ -74,8 +69,13 @@ static void parser_push_position(struct Parser *const self) {
 }
 
 // accept token position and return OK result
-static struct ParseResult parser_success(struct Parser *const self) {
+static struct ParseResult parser_success(
+    struct Parser *const self, 
+    struct AstNodePosition *const out_ast_node_position
+) {
     usize const new_position = usizevec_pop_back(&self->position_stack);
+    out_ast_node_position->position_start = parser_peek(self).position;
+    out_ast_node_position->position_end = self->last_token.position;
     *usizevec_peek_back(&self->position_stack) = new_position;
 
     return (struct ParseResult) {
@@ -149,7 +149,6 @@ static struct ParseError join_parse_errors(
     struct ParseError left  = va_arg(errors, struct ParseError);
     struct ParseError right = va_arg(errors, struct ParseError);
 
-    /*
     for (usize error_index = 2u; error_index < error_count; error_index += 1) {
         left = (struct ParseError) {
             .kind = ParseErrorJoin,
@@ -160,7 +159,6 @@ static struct ParseError join_parse_errors(
         };
         right = va_arg(errors, struct ParseError);
     }
-    */
 
     va_end(errors);
 
@@ -207,12 +205,12 @@ static struct ParseResult parse_binary_operation(
                 },
             };
 
-            return parser_success(parser);
+            return parser_success(parser, &out->position);
         }       
     }
 
     *out = left;
-    return parser_success(parser);
+    return parser_success(parser, &out->position);
 }
 
 // ---------------------
@@ -237,7 +235,7 @@ static struct ParseResult parse_identifier(
     );
 
     out->name = parser->last_token.identifier_name;
-    return parser_success(parser);
+    return parser_success(parser, &out->position);
 }
 
 // constant = `integer`
@@ -253,7 +251,7 @@ static struct ParseResult parse_constant(
     );
 
     out->value = parser->last_token.integer_value;
-    return parser_success(parser);
+    return parser_success(parser, &out->position);
 }
 
 // bracketed_expression = `(` expression `)`
@@ -278,7 +276,7 @@ static struct ParseResult parse_bracketed_expression(
         parser_expect(parser, TokenRightParen)
     );
 
-    return parser_success(parser);
+    return parser_success(parser, &out->position);
 }
 
 // factor = identifier | constant | bracketed_expression
@@ -291,18 +289,18 @@ static struct ParseResult parse_factor(
     struct ParseResult const identifier_result = parse_identifier(&out->identifier, parser);
     if (identifier_result.ok) {
         out->kind = AstExpressionIdentifier;
-        return parser_success(parser);
+        return parser_success(parser, &out->position);
     }
 
     struct ParseResult const constant_result = parse_constant(&out->constant, parser);
     if (constant_result.ok) {
         out->kind = AstExpressionConstant;
-        return parser_success(parser);
+        return parser_success(parser, &out->position);
     }
 
     struct ParseResult const bracketed_expression_result = parse_bracketed_expression(out, parser);
     if (bracketed_expression_result.ok) {
-        return parser_success(parser);
+        return parser_success(parser, &out->position);
     }
 
     return parser_fail(
@@ -367,7 +365,7 @@ static struct ParseResult parse_assignee(
         parse_identifier(&out->identifier, parser)
     );
 
-    return parser_success(parser);
+    return parser_success(parser, &out->position);
 }
 
 // assignment = assignee `=` expression
@@ -407,7 +405,7 @@ static struct ParseResult parse_assignment(
         ),
     };
 
-    return parser_success(parser);
+    return parser_success(parser, &out->position);
 }
 
 // expression = assignment | sum
@@ -418,10 +416,14 @@ static struct ParseResult parse_expression(
     parser_push_position(parser);
 
     struct ParseResult const assignment_result = parse_assignment(out, parser);
-    PARSER_SUCCEED_ON(parser, assignment_result)
+    if (assignment_result.ok) {
+        return parser_success(parser, &out->position);
+    }
 
     struct ParseResult const sum_result = parse_sum(out, parser);
-    PARSER_SUCCEED_ON(parser, sum_result)
+    if (sum_result.ok) {
+        return parser_success(parser, &out->position);
+    }
 
     return parser_fail(
         parser,
@@ -447,7 +449,7 @@ static struct ParseResult parse_type(
     )
 
     out->kind = AstTypeIntS32;
-    return parser_success(parser);
+    return parser_success(parser, &out->position);
 }
 
 // variable_declaration = type identifier `;` | type identifier `=` expression `;`
@@ -487,7 +489,7 @@ static struct ParseResult parse_variable_declaration(
         parser_expect(parser, TokenSemicolon)
     )
 
-    return parser_success(parser);
+    return parser_success(parser, &out->position);
 }
 
 // return = `return` `;` | `return` `expression` `;`
@@ -521,7 +523,7 @@ static struct ParseResult parse_return(
         )
     }
 
-    return parser_success(parser);
+    return parser_success(parser, &out->position);
 }
 
 // statement = return | variable_declaration | expression `;`
@@ -535,14 +537,14 @@ static struct ParseResult parse_statement(
     struct ParseResult const return_result = parse_return(&out->return_statement, parser);
     if (return_result.ok) {
         out->kind = AstStatementReturn;
-        return parser_success(parser);
+        return parser_success(parser, &out->position);
     }
 
     // variable declaration
     struct ParseResult const variable_declaration_result = parse_variable_declaration(&out->variable_declaration, parser);
     if (variable_declaration_result.ok) {
         out->kind = AstStatementVariableDeclaration;
-        return parser_success(parser);
+        return parser_success(parser, &out->position);
     }
 
     // expression statement
@@ -555,7 +557,7 @@ static struct ParseResult parse_statement(
         )
 
         out->kind = AstStatementExpression;
-        return parser_success(parser);
+        return parser_success(parser, &out->position);
     }
 
     return parser_fail(
@@ -597,7 +599,7 @@ static struct ParseResult parse_block(struct AstBlock *const out, struct Parser 
     out->statements = statements.data;
     out->statement_count = statements.len;
 
-    return parser_success(parser);
+    return parser_success(parser, &out->position);
 }
 
 // parameter = type identifier
@@ -617,7 +619,7 @@ static struct ParseResult parse_function_parameter(
     struct ParseResult const identifier_result = parse_identifier(&out->identifier, parser);
     out->has_identifier = identifier_result.ok;
 
-    return parser_success(parser);
+    return parser_success(parser, &out->position);
 }
 
 // function_signature = type identifier `(` parameter_list `)`
@@ -649,7 +651,7 @@ static struct ParseResult parse_function_signature(
         // no parameters
         out->parameters = NULL;
         out->parameter_count = 0u;
-        return parser_success(parser);
+        return parser_success(parser, &out->position);
     }
 
     // parameter list
@@ -675,7 +677,7 @@ static struct ParseResult parse_function_signature(
     out->parameters = parameters.data;
     out->parameter_count = parameters.len;
 
-    return parser_success(parser);
+    return parser_success(parser, &out->position);
 }
 
 // function_definition = function_signature block
@@ -697,7 +699,7 @@ static struct ParseResult parse_function_definition(
         parse_block(&out->body, parser)
     )
 
-    return parser_success(parser);
+    return parser_success(parser, &out->position);
 }
 
 // top_level_item = function_definition
@@ -713,7 +715,7 @@ static struct ParseResult parse_top_level_item(
         = parse_function_definition(&out->function_definition, parser);
     if (function_definition_result.ok) {
         out->kind = AstTopLevelItemFunctionDefinition;
-        return parser_success(parser);
+        return parser_success(parser, &out->position);
     }
 
     return parser_fail(parser, function_definition_result.error);
@@ -738,7 +740,8 @@ static struct ParseResult parse_root(struct AstRoot *const out, struct Parser *c
     out->items = top_level_items.data;
     out->item_count = top_level_items.len;
 
-    return parser_success(parser);
+    struct AstNodePosition node_position_unused;
+    return parser_success(parser, &node_position_unused);
 }
 
 struct ParseResult parse(struct AstRoot *out, struct TokenSlice tokens, struct Arena *ast_arena) {
@@ -758,7 +761,7 @@ void format_parse_error(
         case ParseErrorExpectedToken: {
             writer_writef(
                 writer, 
-                "[%zu:%zu] expected ", 
+                "(%zu:%zu) expected ", 
                 error->expected_token.position.line, 
                 error->expected_token.position.character
             );

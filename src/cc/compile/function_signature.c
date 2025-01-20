@@ -28,6 +28,7 @@ struct CompileResult analyze_function_signature(
         struct AstFunctionParameter const *const ast_parameter = &ast->parameters[parameter_index];
 
         out_parameter->name = ast_parameter->identifier.name;
+        out_parameter->ast_node_position = ast_parameter->position;
 
         struct CompileResult result 
             = analyze_type(&out_parameter->type, &ast_parameter->type, compiler);

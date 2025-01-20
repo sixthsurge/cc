@@ -18,9 +18,23 @@ struct CompileResult compile_error(struct CompileError const error) {
 }
 
 void format_compile_error(struct Writer *const writer, struct CompileError const *const error) {
+    writer_writef(
+        writer, 
+        "(%zu:%zu-%zu:%zu) ", 
+        error->position.position_start.line,
+        error->position.position_start.character,
+        error->position.position_end.line,
+        error->position.position_end.character
+    );
+
     switch (error->kind) {
         case CompileErrorUnknown: {
             writer_write(writer, "unknown error");
+            break;
+        }
+        case CompileErrorUndeclaredIdentifier: {
+            writer_write(writer, "undeclared identifier: ");
+            writer_write_charslice(writer, error->undeclared_identifier.name);
             break;
         }
         case CompileErrorNotImplemented: {

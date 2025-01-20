@@ -38,6 +38,7 @@ struct Type {
 
 bool type_eq(struct Type const *self, struct Type const *other);
 bool type_can_coerce(struct Type const *dst, struct Type const *src);
+bool type_is_integer_or_pointer(struct Type const *self);
 usize type_size_bytes(struct Type const *type);
 void type_debug(struct Writer *writer, struct Type const *type);
 

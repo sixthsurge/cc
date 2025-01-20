@@ -1,6 +1,7 @@
 #include "cc/compile/statement.h"
 
 #include "cc/ast.h"
+#include "cc/compile/assembly.h"
 #include "cc/compile/error.h"
 #include "cc/compile/expression.h"
 #include "cc/compile/type.h"
@@ -26,7 +27,8 @@ static struct CompileResult compile_variable_declaration(
         compiler, 
         &variable_desc,
         ast->identifier.name,
-        type
+        type,
+        ast->position
     );
 
     if (!declare_result.ok) {
@@ -46,6 +48,7 @@ static struct CompileResult compile_variable_declaration(
         if (!type_can_coerce(&type, &expression_value.type)) {
             return compile_error((struct CompileError) {
                 .kind = CompileErrorIncompatibleTypes,
+                .position = ast->position,
                 .incompatible_types = {
                     .first = type,
                     .second = expression_value.type,
@@ -67,9 +70,28 @@ static struct CompileResult compile_variable_declaration(
 
 static struct CompileResult compile_return_statement(
     struct Compiler *const compiler, 
-    struct AstReturn const *const ast,
-    struct Type const *const return_type
+    struct AstReturn const *const ast
 ) {
+    // compile returned expression
+
+    if (ast->has_returned_expression) {
+        struct ExpressionValue expression_value;
+        struct CompileResult expression_result 
+            = compile_expression(&expression_value, compiler, &ast->returned_expression);
+
+        if (!expression_result.ok) {
+            return expression_result;
+        }
+
+        emit_moves(
+            &compiler->writer_function_body, 
+            operand_register(expression_value.operand.width, RegisterA),
+            expression_value.operand,
+            RegisterA
+        );
+        emit_function_exit(&compiler->writer_function_body);
+    }
+
     return compile_ok();
 }
 
@@ -91,6 +113,7 @@ struct CompileResult compile_statement(
         default: {
             return compile_error((struct CompileError) {
                 .kind = CompileErrorNotImplemented,
+                .position = ast->position,
             });
         }
     }

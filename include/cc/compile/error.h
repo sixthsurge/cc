@@ -1,5 +1,6 @@
 #pragma once 
 
+#include "cc/ast.h"
 #include "cc/slice.h"
 #include "cc/token.h"
 #include "cc/type.h"
@@ -8,6 +9,7 @@
 enum CompileErrorKind {
     CompileErrorUnknown,
     CompileErrorNotImplemented,
+    CompileErrorUndeclaredIdentifier,
     CompileErrorIncompatibleTypes,
     CompileErrorVariableRedeclaration,
     CompileErrorFunctionRedefinition,
@@ -16,7 +18,12 @@ enum CompileErrorKind {
 
 struct CompileError {
     enum CompileErrorKind kind;
+    struct AstNodePosition position;
+
     union {
+        struct {
+            struct CharSlice name;
+        } undeclared_identifier;
         struct {
             struct Type first;
             struct Type second;

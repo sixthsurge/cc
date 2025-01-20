@@ -1,5 +1,6 @@
 #include "cc/compile/variable_table.h"
 
+#include "cc/ast.h"
 #include "cc/compile/error.h"
 #include "cc/hash.h"
 
@@ -34,11 +35,13 @@ void variable_table_free(struct VariableTable *const self) {
 
 struct CompileResult variable_table_update(
     struct VariableTable *const self, 
-    struct VariableDescription const variable_desc
+    struct VariableDescription const variable_desc,
+    struct AstNodePosition const position
 ) {
     if (variable_table_has(self, variable_desc.name)) {
         return compile_error((struct CompileError) {
             .kind = CompileErrorVariableRedeclaration,
+            .position = position,
             .variable_redeclaration = {
                 .name = variable_desc.name,
             }

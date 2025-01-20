@@ -1,11 +1,9 @@
-int example_function() {
+int example_function(int a) {
     return 5;
 }
 
 int main() {
-    int x = 3 + 3;
-    int y = 4;
-    x = x + 1;
-    return x + y + 1;
+    int x = 3;
+    return x;
 }
 

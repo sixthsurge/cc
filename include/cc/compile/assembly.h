@@ -104,6 +104,7 @@ void emit_instruction(
 
 void emit_label(struct Writer *assembly_writer, struct CharSlice label);
 void emit_function_prologue(struct Writer *assembly_writer, usize stack_usage);
+void emit_function_exit(struct Writer *assembly_writer);
 
 // emit mov instructions as necessary to move src to dst 
 // may use `intermediate_register` as necessary

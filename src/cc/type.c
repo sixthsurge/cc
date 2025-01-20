@@ -27,6 +27,10 @@ usize type_size_bytes(struct Type const *const type) {
     exit(1);
 }
 
+bool type_is_integer_or_pointer(struct Type const *self) {
+    return true;
+}
+
 bool type_eq(struct Type const *self, struct Type const *other) {
     // TEMP: all types are ints so all types are equal :)
     return true;

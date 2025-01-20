@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 
+#include "cc/ast.h"
 #include "cc/common.h"
 #include "cc/compile/error.h"
 #include "cc/compile/variable_table.h"
@@ -40,7 +41,8 @@ struct CompileResult compiler_declare_variable(
     struct Compiler *const self, 
     struct VariableDescription *variable_desc_out, 
     struct CharSlice const name, 
-    struct Type const type
+    struct Type const type,
+    struct AstNodePosition const position
 ) {
     // update stack offset
     usize const size_bytes = type_size_bytes(&type);
@@ -55,5 +57,5 @@ struct CompileResult compiler_declare_variable(
         .stack_offset = self->stack_offset,
     };
 
-    return variable_table_update(self->variable_table, *variable_desc_out);
+    return variable_table_update(self->variable_table, *variable_desc_out, position);
 }

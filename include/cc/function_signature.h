@@ -1,11 +1,13 @@
 #pragma once
 
+#include "cc/ast.h"
 #include "cc/slice.h"
 #include "cc/type.h"
 
 struct FunctionParameter {
     struct CharSlice name;
     struct Type type;
+    struct AstNodePosition ast_node_position;
 };
 
 struct FunctionSignature {

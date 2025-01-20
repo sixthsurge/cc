@@ -53,8 +53,9 @@ i32 main(void) {
     );
 
     if (!parse_result.ok) {
-        log_error("parsing error");
+        printf("[%sParse Error%s] ", color_red, color_reset);
         format_parse_error(&stdout_writer, &parse_result.error);
+        printf("\n");
         return 1;
     }
 
@@ -74,8 +75,9 @@ i32 main(void) {
     struct CompileResult const compile_result = compile(&assembly_writer, &ast);
 
     if (!compile_result.ok) {
-        log_error("compile error");
+        printf("[%sCompile Error%s] ", color_red, color_reset);
         format_compile_error(&stdout_writer, &compile_result.error);
+        printf("\n");
         exit(1);
     }
 
