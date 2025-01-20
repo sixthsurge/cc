@@ -19,12 +19,12 @@ typedef uint64_t u64;
 typedef float    f32;
 typedef double   f64;
 
-static char const *const color_reset   = "\e[0m";
-static char const *const color_black   = "\e[0;30m";
-static char const *const color_red     = "\e[0;31m";
-static char const *const color_green   = "\e[0;32m";
-static char const *const color_yellow  = "\e[0;33m";
-static char const *const color_magenta = "\e[0;35m";
+static char const *const color_reset   = "\033[0m";
+static char const *const color_black   = "\033[0;30m";
+static char const *const color_red     = "\033[0;31m";
+static char const *const color_green   = "\033[0;32m";
+static char const *const color_yellow  = "\033[0;33m";
+static char const *const color_magenta = "\033[0;35m";
 
 static inline usize max_usize(usize const a, usize const b) {
     if (a > b) {

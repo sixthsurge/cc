@@ -42,7 +42,7 @@ struct CompileResult variable_table_update(
         return compile_error((struct CompileError) {
             .kind = CompileErrorVariableRedeclaration,
             .position = position,
-            .variable_redeclaration = {
+            .variant.variable_redeclaration = {
                 .name = variable_desc.name,
             }
         });

@@ -59,13 +59,13 @@ void token_debug(struct Writer *writer, struct Token const *token) {
     switch (token->kind) {
         case TokenIdentifier: {
             writer_write(writer, "<identifier: ");
-            writer_write_charslice(writer, token->identifier_name);
+            writer_write_charslice(writer, token->variant.identifier_name);
             writer_write(writer, ">");
             break;
         }
         case TokenInteger: {
             writer_write(writer, "<integer: ");
-            writer_writef(writer, "%d", token->integer_value);
+            writer_writef(writer, "%d", token->variant.integer_value);
             writer_write(writer, ">");
             break;
         }

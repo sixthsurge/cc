@@ -74,7 +74,8 @@ bool function_table_get(
     usize const *const index = map__charslice_usize__get(&self->function_index, name);
 
     if (index != NULL) {
-        return fdvec_at(&self->function_descriptions, *index);
+        *out = *fdvec_at(&self->function_descriptions, *index);
+        return true;
     } else {
         return false;
     }
@@ -94,7 +95,7 @@ struct CompileResult function_table_declare(
                 (struct CompileError) {
                     .kind = CompileErrorFunctionSignatureMismatch,
                     .position = position,
-                    .function_signature_mismatch = {
+                    .variant.function_signature_mismatch = {
                         .name = name,
                     },
                 }
@@ -126,7 +127,7 @@ struct CompileResult function_table_define(
                 (struct CompileError) {
                     .kind = CompileErrorFunctionSignatureMismatch,
                     .position = position,
-                    .function_signature_mismatch = {
+                    .variant.function_signature_mismatch = {
                         .name = name,
                     },
                 }
@@ -136,7 +137,7 @@ struct CompileResult function_table_define(
                 (struct CompileError) {
                     .kind = CompileErrorFunctionRedefinition,
                     .position = position,
-                    .function_signature_mismatch = {
+                    .variant.function_redefinition = {
                         .name = name,
                     },
                 }

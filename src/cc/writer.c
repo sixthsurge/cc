@@ -10,14 +10,14 @@
 struct Writer file_writer(FILE *const file) {
     return (struct Writer) {
         .kind = WriterKindFile,
-        .file = { .file = file },
+        .variant.file = { .file = file },
     };
 }
 
 struct Writer charvec_writer(struct CharVec *const buffer) {
     return (struct Writer) {
         .kind = WriterKindCharVec,
-        .charvec = { .buffer = buffer },
+        .variant.charvec = { .buffer = buffer },
     };
 }
 
@@ -27,13 +27,13 @@ void writer_write(
 ) {
     switch (self->kind) {
         case WriterKindFile: {
-            fputs(string, self->file.file);
+            fputs(string, self->variant.file.file);
             break;
         }
 
         case WriterKindCharVec: {
             charvec_push_slice(
-                self->charvec.buffer, 
+                self->variant.charvec.buffer, 
                 charslice_from_cstr(string)
             );
             break;
@@ -51,7 +51,7 @@ void writer_writef(
 
     switch (self->kind) {
         case WriterKindFile: {
-            vfprintf(self->file.file, format_string, args);
+            vfprintf(self->variant.file.file, format_string, args);
             break;
         }
 
@@ -59,7 +59,7 @@ void writer_writef(
             char *buf;
             vasprintf(&buf, format_string, args);
             charvec_push_slice(
-                self->charvec.buffer, 
+                self->variant.charvec.buffer, 
                 charslice_from_cstr(buf)
             );
             free(buf);
@@ -73,12 +73,11 @@ void writer_writef(
 void writer_write_charslice(struct Writer const *self, struct CharSlice slice) {
     switch (self->kind) {
         case WriterKindFile: {
-            fputs(charslice_as_cstr(slice), self->file.file);
+            fputs(charslice_as_cstr(slice), self->variant.file.file);
             break;
         }
-
         case WriterKindCharVec: {
-            charvec_push_slice(self->charvec.buffer, slice);
+            charvec_push_slice(self->variant.charvec.buffer, slice);
             break;
         }
     }

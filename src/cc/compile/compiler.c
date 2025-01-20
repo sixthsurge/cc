@@ -4,6 +4,7 @@
 
 #include "cc/ast.h"
 #include "cc/common.h"
+#include "cc/compile/assembly.h"
 #include "cc/compile/error.h"
 #include "cc/compile/variable_table.h"
 #include "cc/log.h"
@@ -58,4 +59,25 @@ struct CompileResult compiler_declare_variable(
     };
 
     return variable_table_update(self->variable_table, *variable_desc_out, position);
+}
+
+struct Operand compiler_allocate_temporary_stack_space(
+    struct Compiler *const self, 
+    usize const size_bytes
+) { 
+    self->stack_offset_temporary += size_bytes;
+    self->stack_offset_max = max_usize(self->stack_offset_temporary, self->stack_offset_max);
+    return operand_stack(self->stack_offset_temporary);
+}
+
+void compiler_free_temporary_stack_space(
+    struct Compiler *const self, 
+    usize const size_bytes
+) {
+    if (self->stack_offset_temporary >= size_bytes) {
+        self->stack_offset_temporary -= size_bytes;
+    } else {
+        log_error("compiler_free_temporary_stack_space: over-free");
+        exit(1);
+    }
 }

@@ -76,8 +76,8 @@ struct AstConstant {
 
 struct AstCall {
     struct AstNodePosition position;
-    struct AstExpression const *callee;
-    struct AstExpression const *arguments;
+    struct AstIdentifier callee;
+    struct AstExpression *arguments;
     usize argument_count;
 }; 
 
@@ -105,7 +105,7 @@ struct AstExpression {
         struct AstCall call;
         struct AstUnaryOp unary_op;
         struct AstBinaryOp binary_op;
-    };
+    } variant;
 };
 
 struct AstVariableDeclaration {
@@ -130,7 +130,7 @@ struct AstStatement {
         struct AstExpression expression;
         struct AstVariableDeclaration variable_declaration;
         struct AstReturn return_statement;
-    };
+    } variant;
 };
 
 struct AstBlock {
@@ -166,7 +166,7 @@ struct AstTopLevelItem {
 
     union {
         struct AstFunctionDefinition function_definition;
-    };
+    } variant;
 };
 
 struct AstRoot {

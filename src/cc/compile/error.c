@@ -4,7 +4,7 @@
 #include "cc/type.h"
 #include "cc/writer.h"
 
-struct CompileResult compile_ok() {
+struct CompileResult compile_ok(void) {
     return (struct CompileResult) {
         .ok = true,
     };
@@ -32,40 +32,51 @@ void format_compile_error(struct Writer *const writer, struct CompileError const
             writer_write(writer, "unknown error");
             break;
         }
-        case CompileErrorUndeclaredIdentifier: {
-            writer_write(writer, "undeclared identifier: ");
-            writer_write_charslice(writer, error->undeclared_identifier.name);
-            break;
-        }
         case CompileErrorNotImplemented: {
             writer_write(writer, "not implemented");
             break;
         }
+        case CompileErrorUndeclaredIdentifier: {
+            writer_write(writer, "undeclared identifier: ");
+            writer_write_charslice(writer, error->variant.undeclared_identifier.name);
+            break;
+        }
+        case CompileErrorIncorrectArgumentCount: {
+            writer_write(writer, "incorrect argument count for function ");
+            writer_write_charslice(writer, error->variant.incorrect_argument_count.function_name);
+            writer_writef(
+                writer,
+                ": expected %zu, got %zu",
+                error->variant.incorrect_argument_count.expected,
+                error->variant.incorrect_argument_count.got
+            );
+            break;
+        }
         case CompileErrorIncompatibleTypes: {
             writer_write(writer, "incompatible types: ");
-            type_debug(writer, &error->incompatible_types.first);
+            type_debug(writer, &error->variant.incompatible_types.first);
             writer_write(writer, " and ");
-            type_debug(writer, &error->incompatible_types.second);
+            type_debug(writer, &error->variant.incompatible_types.second);
             break;
         }
         case CompileErrorVariableRedeclaration: {
             writer_write(writer, "redeclaration of ");
             writer_write(writer, color_magenta);
-            writer_write_charslice(writer, error->variable_redeclaration.name);
+            writer_write_charslice(writer, error->variant.variable_redeclaration.name);
             writer_write(writer, color_reset);
             break;
         }
         case CompileErrorFunctionRedefinition: {
             writer_write(writer, "redefinition of ");
             writer_write(writer, color_magenta);
-            writer_write_charslice(writer, error->function_redefinition.name);
+            writer_write_charslice(writer, error->variant.function_redefinition.name);
             writer_write(writer, color_reset);
             break;
         }
         case CompileErrorFunctionSignatureMismatch: {
             writer_write(writer, "mismatched function signature in ");
             writer_write(writer, color_magenta);
-            writer_write_charslice(writer, error->function_signature_mismatch.name);
+            writer_write_charslice(writer, error->variant.function_signature_mismatch.name);
             writer_write(writer, color_reset);
             break;
         }

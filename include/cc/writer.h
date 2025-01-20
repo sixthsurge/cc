@@ -24,7 +24,7 @@ struct Writer {
         struct {
             struct CharVec *buffer;
         } charvec;
-    };
+    } variant;
 };
 
 struct Writer file_writer(FILE *file);

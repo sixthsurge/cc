@@ -24,7 +24,7 @@ struct ParseError {
             enum TokenKind expected;
             enum TokenKind got;
         } expected_token;
-    };
+    } variant;
 };
 
 struct ParseResult {

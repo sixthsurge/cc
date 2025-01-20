@@ -8,13 +8,17 @@ enum Instruction {
     // 0 operands
     InstructionLeave,
     InstructionRet,
+    InstructionCdq,
     // 1 operand
     InstructionPush,
     InstructionPop,
+    InstructionCall,
+    InstructionIDiv,
     // 2 operands
     InstructionMov,
     InstructionAdd,
     InstructionSub,
+    InstructionIMul,
     InstructionCount,
 };
 
@@ -38,16 +42,9 @@ enum IntRegister {
     RegisterCount,
 };
 
-enum OperandWidth {
-    Byte,
-    Word,
-    DWord,
-    QWord,
-    OperandWidthCount
-};
-
 enum OperandKind {
     OperandImmediate,
+    OperandLabel,
     OperandRegister,
     OperandMemory,
     OperandMemoryIndexed,
@@ -55,12 +52,14 @@ enum OperandKind {
 
 struct Operand {
     enum OperandKind kind;
-    enum OperandWidth width;
 
     union {
         struct {
             i32 value;
         } immediate;
+        struct {
+            struct CharSlice name;
+        } label;
         struct {
             enum IntRegister reg;
         } int_register;
@@ -74,7 +73,15 @@ struct Operand {
             i32 offset;
             i32 index_scale;
         } memory_indexed;
-    };
+    } variant;
+};
+
+enum OperandWidth {
+    Byte,
+    Word,
+    DWord,
+    QWord,
+    OperandWidthCount
 };
 
 char const *format_operand_width(enum OperandWidth operand_width);
@@ -82,22 +89,23 @@ char const *format_register(enum IntRegister reg, enum OperandWidth operand_widt
 char const *format_instruction(enum Instruction instruction);
 usize instruction_expected_operand_count(enum Instruction instruction);
 
-struct Operand operand_immediate(enum OperandWidth width, i32 value);
-struct Operand operand_register(enum OperandWidth width, enum IntRegister reg);
-struct Operand operand_memory(enum OperandWidth width, enum IntRegister base_reg, i32 offset);
+struct Operand operand_immediate(i32 value);
+struct Operand operand_label(struct CharSlice name);
+struct Operand operand_register(enum IntRegister reg);
+struct Operand operand_memory(enum IntRegister base_reg, i32 offset);
 struct Operand operand_memory_indexed(
-    enum OperandWidth width,
     enum IntRegister base_reg, 
     enum IntRegister index_reg, 
     i32 offset, 
     i32 index_scale
 );
-struct Operand operand_stack(enum OperandWidth width, usize stack_offset);
+struct Operand operand_stack(usize stack_offset);
 
-void emit_operand(struct Writer *assembly_writer, struct Operand operand);
+void emit_operand(struct Writer *assembly_writer, struct Operand operand, enum OperandWidth width);
 void emit_instruction(
     struct Writer *assembly_writer, 
     enum Instruction instruction,
+    enum OperandWidth operand_width,
     usize operand_count, 
     ...
 );
@@ -113,6 +121,7 @@ void emit_moves(
     struct Writer *assembly_writer, 
     struct Operand dst, 
     struct Operand src, 
+    enum OperandWidth operand_width,
     enum IntRegister intermediate_register
 );
 

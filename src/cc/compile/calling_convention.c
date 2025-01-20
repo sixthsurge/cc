@@ -10,10 +10,10 @@
 
 void argument_location_context_init(struct ArgumentLocationContext *const self) {
     self->int_argument_index = 0u;
-    self->stack_displacement = 16u;
+    self->stack_displacement = 0u;
 }
 
-struct ArgumentLocation locate_next_argument(
+struct Operand locate_next_argument(
     struct ArgumentLocationContext *const context,
     struct Type const *const type
 ) {
@@ -26,36 +26,17 @@ struct ArgumentLocation locate_next_argument(
         Register9,
     };
 
-    struct ArgumentLocation argument_location;
-
     if (type_is_integer_or_pointer(type) && context->int_argument_index < 6u) {
-        argument_location.kind = ArgumentLocationIntRegister;
-        argument_location.int_register = first_int_registers[context->int_argument_index];
+        struct Operand const operand 
+            = operand_register(first_int_registers[context->int_argument_index]);
         context->int_argument_index += 1u;
+        return operand;
     } else {
-        argument_location.kind = ArgumentLocationStack;
-        argument_location.stack_displacement = context->stack_displacement;
+        struct Operand const operand 
+            = operand_memory(RegisterBP, context->stack_displacement + 16u);
 
         // TODO: make this based on the type lol
         context->stack_displacement += 8u;
+        return operand;
     }
-
-    return argument_location;
-}
-
-struct Operand argument_location_operand(
-    enum OperandWidth const width, 
-    struct ArgumentLocation const self
-) {
-    switch (self.kind) {
-        case ArgumentLocationIntRegister: {
-            return operand_register(width, self.int_register);
-        }
-        case ArgumentLocationStack: {
-            return operand_memory(width, RegisterBP, self.stack_displacement);
-        }
-    }
-
-    log_error("argument_location_operand: unknown argument location");
-    exit(1);
 }

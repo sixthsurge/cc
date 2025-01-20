@@ -17,7 +17,7 @@ void ast_debug_root(struct Writer *writer, struct AstRoot const *self) {
 void ast_debug_top_level_item(struct Writer *writer, struct AstTopLevelItem const *self) {
     switch (self->kind) {
         case AstTopLevelItemFunctionDefinition: {
-            ast_debug_function_definition(writer, &self->function_definition);
+            ast_debug_function_definition(writer, &self->variant.function_definition);
             break;
         }       
     }
@@ -87,15 +87,15 @@ void ast_debug_block(struct Writer *writer, struct AstBlock const *self) {
 void ast_debug_statement(struct Writer *writer, struct AstStatement const *self) {
     switch (self->kind) {
         case AstStatementExpression: {
-            ast_debug_expression(writer, &self->expression);
+            ast_debug_expression(writer, &self->variant.expression);
             break;
         }
         case AstStatementVariableDeclaration: {
-            ast_debug_variable_declaration(writer, &self->variable_declaration);
+            ast_debug_variable_declaration(writer, &self->variant.variable_declaration);
             break;
         }
         case AstStatementReturn: {
-            ast_debug_return(writer, &self->return_statement);
+            ast_debug_return(writer, &self->variant.return_statement);
             break;
         }
     }
@@ -134,27 +134,27 @@ void ast_debug_return(struct Writer *writer, struct AstReturn const *self) {
 void ast_debug_expression(struct Writer *writer, struct AstExpression const *self) {
     switch (self->kind) {
         case AstExpressionIdentifier: {
-            ast_debug_identifier(writer, &self->identifier);
+            ast_debug_identifier(writer, &self->variant.identifier);
             break;
         }
         case AstExpressionConstant: {
-            ast_debug_constant(writer, &self->constant);
+            ast_debug_constant(writer, &self->variant.constant);
             break;
         }
         case AstExpressionAssignment: {
-            ast_debug_assignment(writer, &self->assignment);
+            ast_debug_assignment(writer, &self->variant.assignment);
             break;
         }
         case AstExpressionCall: {
-            ast_debug_call(writer, &self->call);
+            ast_debug_call(writer, &self->variant.call);
             break;
         }
         case AstExpressionUnaryOp: {
-            ast_debug_unary_op(writer, &self->unary_op);
+            ast_debug_unary_op(writer, &self->variant.unary_op);
             break;
         }
         case AstExpressionBinaryOp: {
-            ast_debug_binary_op(writer, &self->binary_op);
+            ast_debug_binary_op(writer, &self->variant.binary_op);
             break;
         }
     }
@@ -227,7 +227,7 @@ void ast_debug_call(struct Writer *writer, struct AstCall const *self) {
     writer_write(writer, "Call(");
 
     writer_write(writer, "callee = ");
-    ast_debug_expression(writer, self->callee);
+    ast_debug_identifier(writer, &self->callee);
 
     writer_write(writer, "arguments = [");
     for (usize i = 0; i < self->argument_count; ++i) {

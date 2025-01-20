@@ -14,7 +14,7 @@ file(GLOB_RECURSE src src/*.c)
 
 add_executable(cc ${src})
 
-target_compile_options(cc PUBLIC -Wall)
+target_compile_options(cc PUBLIC -Wall -Wextra -Wpedantic)
 
 target_include_directories(cc PUBLIC include)
 

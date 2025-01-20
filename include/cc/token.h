@@ -67,7 +67,7 @@ struct Token {
     union {
         struct CharSlice identifier_name;
         i32 integer_value;
-    };
+    } variant;
 };
 
 void token_kind_debug(struct Writer *writer, enum TokenKind const *kind);

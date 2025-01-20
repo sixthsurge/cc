@@ -38,20 +38,18 @@ static struct CompileResult compile_function_parameters(
             parameter->ast_node_position
         );
 
-        if (!declare_result.ok) {
-            return declare_result;
-        }
+        if (!declare_result.ok) return declare_result;
 
         // store passed argument in variable
 
-        struct ArgumentLocation const argument_location 
+        struct Operand const operand_src 
             = locate_next_argument(&argument_location_context, &variable_desc.type);
-        struct Operand const operand_src = argument_location_operand(DWord, argument_location);
 
         emit_moves(
             &compiler->writer_function_body, 
-            operand_stack(DWord, variable_desc.stack_offset), 
+            operand_stack(variable_desc.stack_offset), 
             operand_src, 
+            DWord,
             RegisterA
         );
     }

@@ -11,7 +11,7 @@ struct CompileResult compile_root(struct Compiler *compiler, struct AstRoot cons
 
         switch (item->kind) {
             case AstTopLevelItemFunctionDefinition: {
-                result = compile_function_definition(compiler, &item->function_definition);
+                result = compile_function_definition(compiler, &item->variant.function_definition);
                 break;
             }
         }

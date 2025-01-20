@@ -33,7 +33,7 @@ struct Type {
 
     union {
         struct PointerType pointer_type;
-    };
+    } variant;
 };
 
 bool type_eq(struct Type const *self, struct Type const *other);

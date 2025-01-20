@@ -156,7 +156,7 @@ static struct Token lexer_next_token(struct Lexer *const self) {
                 struct CharSlice const word = lexer_next_word(self);
 
                 token.kind = TokenInteger;
-                token.integer_value = atoi(word.ptr);
+                token.variant.integer_value = atoi(word.ptr);
             } else if (is_letter_or_underscore(c)) {
                 // word
                 self->character_index -= 1;
@@ -200,7 +200,7 @@ static struct Token lexer_next_token(struct Lexer *const self) {
                     token.kind = TokenKeywordDouble;
                 } else {
                     token.kind = TokenIdentifier;
-                    token.identifier_name = word;
+                    token.variant.identifier_name = word;
                 }
             } else {
                 token.kind = TokenUnknown;

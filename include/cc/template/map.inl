@@ -25,7 +25,7 @@ void MAP_PREFIX(init)(
 ) {
     self->table_size    = table_size;
     self->element_count = 0u;
-    self->entries       = calloc(sizeof (void *), self->table_size);
+    self->entries       = calloc(self->table_size, sizeof (void *));
 }
 
 void MAP_PREFIX(clone)(
@@ -34,7 +34,7 @@ void MAP_PREFIX(clone)(
 ) {
     self->table_size    = other->table_size;
     self->element_count = other->element_count;
-    self->entries       = calloc(sizeof (void *), self->table_size);
+    self->entries       = calloc(self->table_size, sizeof (void *));
 
     memcpy(self->entries, other->entries, sizeof (void *) * other->table_size);
 }

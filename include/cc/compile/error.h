@@ -11,11 +11,11 @@ enum CompileErrorKind {
     CompileErrorNotImplemented,
     CompileErrorUndeclaredIdentifier,
     CompileErrorIncompatibleTypes,
+    CompileErrorIncorrectArgumentCount,
     CompileErrorVariableRedeclaration,
     CompileErrorFunctionRedefinition,
     CompileErrorFunctionSignatureMismatch,
 };
-
 struct CompileError {
     enum CompileErrorKind kind;
     struct AstNodePosition position;
@@ -29,6 +29,11 @@ struct CompileError {
             struct Type second;
         } incompatible_types;
         struct {
+            struct CharSlice function_name;
+            usize expected;
+            usize got;
+        } incorrect_argument_count;
+        struct {
             struct CharSlice name;
         } variable_redeclaration;
         struct {
@@ -37,7 +42,7 @@ struct CompileError {
         struct {
             struct CharSlice name;
         } function_signature_mismatch;
-    };
+    } variant;
 };
 
 struct CompileResult {
@@ -46,7 +51,7 @@ struct CompileResult {
     struct CompileError error;
 };
 
-struct CompileResult compile_ok();
+struct CompileResult compile_ok(void);
 struct CompileResult compile_error(struct CompileError error);
 
 void format_compile_error(struct Writer *writer, struct CompileError const *error);

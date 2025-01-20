@@ -3,6 +3,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 
+#include "cc/arena.h"
 #include "cc/ast.h"
 #include "cc/log.h"
 #include "cc/token.h"
@@ -119,7 +120,7 @@ static struct ParseResult parser_expect(
         struct Token const next = parser_peek(self);
         struct ParseError const error = {
             .kind = ParseErrorExpectedToken,
-            .expected_token = {
+            .variant.expected_token = {
                 .position = next.position,
                 .got = next.kind,
                 .expected = token,
@@ -152,7 +153,7 @@ static struct ParseError join_parse_errors(
     for (usize error_index = 2u; error_index < error_count; error_index += 1) {
         left = (struct ParseError) {
             .kind = ParseErrorJoin,
-            .join = {
+            .variant.join = {
                 .left = arena_copy(arena, &left, sizeof left),
                 .right = arena_copy(arena, &right, sizeof right),
             },
@@ -164,7 +165,7 @@ static struct ParseError join_parse_errors(
 
     return (struct ParseError) {
         .kind = ParseErrorJoin,
-        .join = {
+        .variant.join = {
             .left = arena_copy(arena, &left, sizeof left),
             .right = arena_copy(arena, &right, sizeof right),
         },
@@ -198,7 +199,7 @@ static struct ParseResult parse_binary_operation(
 
             *out = (struct AstExpression) {
                 .kind = AstExpressionBinaryOp,
-                .binary_op = (struct AstBinaryOp) {
+                .variant.binary_op = (struct AstBinaryOp) {
                     .kind = ops[op_index],
                     .left = arena_copy(parser->ast_arena, &left, sizeof left),
                     .right = arena_copy(parser->ast_arena, &right, sizeof right),
@@ -234,7 +235,7 @@ static struct ParseResult parse_identifier(
         parser_expect(parser, TokenIdentifier)
     );
 
-    out->name = parser->last_token.identifier_name;
+    out->name = parser->last_token.variant.identifier_name;
     return parser_success(parser, &out->position);
 }
 
@@ -250,7 +251,7 @@ static struct ParseResult parse_constant(
         parser_expect(parser, TokenInteger)
     );
 
-    out->value = parser->last_token.integer_value;
+    out->value = parser->last_token.variant.integer_value;
     return parser_success(parser, &out->position);
 }
 
@@ -286,13 +287,13 @@ static struct ParseResult parse_factor(
 ) {
     parser_push_position(parser);
 
-    struct ParseResult const identifier_result = parse_identifier(&out->identifier, parser);
+    struct ParseResult const identifier_result = parse_identifier(&out->variant.identifier, parser);
     if (identifier_result.ok) {
         out->kind = AstExpressionIdentifier;
         return parser_success(parser, &out->position);
     }
 
-    struct ParseResult const constant_result = parse_constant(&out->constant, parser);
+    struct ParseResult const constant_result = parse_constant(&out->variant.constant, parser);
     if (constant_result.ok) {
         out->kind = AstExpressionConstant;
         return parser_success(parser, &out->position);
@@ -396,13 +397,65 @@ static struct ParseResult parse_assignment(
     );
 
     out->kind = AstExpressionAssignment;
-    out->assignment = (struct AstAssignment) {
+    out->variant.assignment = (struct AstAssignment) {
         .assignee = assignee,
         .assigned_expression = arena_copy(
             parser->ast_arena, 
             &assigned_expression, 
             sizeof assigned_expression
         ),
+    };
+
+    return parser_success(parser, &out->position);
+}
+
+// argument_list = e | expression | argument_list `,` expression
+// call = expression `(` argument_list `)`
+static struct ParseResult parse_call(
+    struct AstExpression *const out, 
+    struct Parser *const parser
+) {
+    parser_push_position(parser);
+
+    // called expression
+    struct AstIdentifier callee;
+    PARSER_FAIL_ON(
+        parser, 
+        parse_identifier(&callee, parser)
+    )
+
+    // `(`
+    PARSER_FAIL_ON(
+        parser, 
+        parser_expect(parser, TokenLeftParen)
+    )
+
+    // arguments
+    struct ArenaVec arguments;
+    arenavec_init(&arguments, parser->ast_arena, sizeof (struct AstExpression));
+
+    if (!parser_accept(parser, TokenRightParen)) {
+         do {
+            struct AstExpression expression;
+            PARSER_FAIL_ON(
+                parser, 
+                parse_expression(&expression, parser)
+            )
+            arenavec_push(&arguments, &expression);
+        } while (parser_accept(parser, TokenComma));
+
+        // `)`
+        PARSER_FAIL_ON(
+            parser, 
+            parser_expect(parser, TokenRightParen)
+        )
+    }
+
+    out->kind = AstExpressionCall;
+    out->variant.call = (struct AstCall) {
+        .callee = callee,
+        .arguments = arguments.data,
+        .argument_count = arguments.len,
     };
 
     return parser_success(parser, &out->position);
@@ -420,6 +473,11 @@ static struct ParseResult parse_expression(
         return parser_success(parser, &out->position);
     }
 
+    struct ParseResult const call_result = parse_call(out, parser);
+    if (call_result.ok) {
+        return parser_success(parser, &out->position);
+    }
+
     struct ParseResult const sum_result = parse_sum(out, parser);
     if (sum_result.ok) {
         return parser_success(parser, &out->position);
@@ -429,8 +487,9 @@ static struct ParseResult parse_expression(
         parser,
         join_parse_errors(
             parser->ast_arena, 
-            2u,
+            3u,
             sum_result.error,
+            call_result.error,
             assignment_result.error
         )
     );
@@ -534,21 +593,21 @@ static struct ParseResult parse_statement(
     parser_push_position(parser);
 
     // return statement
-    struct ParseResult const return_result = parse_return(&out->return_statement, parser);
+    struct ParseResult const return_result = parse_return(&out->variant.return_statement, parser);
     if (return_result.ok) {
         out->kind = AstStatementReturn;
         return parser_success(parser, &out->position);
     }
 
     // variable declaration
-    struct ParseResult const variable_declaration_result = parse_variable_declaration(&out->variable_declaration, parser);
+    struct ParseResult const variable_declaration_result = parse_variable_declaration(&out->variant.variable_declaration, parser);
     if (variable_declaration_result.ok) {
         out->kind = AstStatementVariableDeclaration;
         return parser_success(parser, &out->position);
     }
 
     // expression statement
-    struct ParseResult const expression_result = parse_expression(&out->expression, parser);
+    struct ParseResult const expression_result = parse_expression(&out->variant.expression, parser);
     if (expression_result.ok) {
         // semicolon 
         PARSER_FAIL_ON(
@@ -712,7 +771,7 @@ static struct ParseResult parse_top_level_item(
 
     // function definition
     struct ParseResult const function_definition_result 
-        = parse_function_definition(&out->function_definition, parser);
+        = parse_function_definition(&out->variant.function_definition, parser);
     if (function_definition_result.ok) {
         out->kind = AstTopLevelItemFunctionDefinition;
         return parser_success(parser, &out->position);
@@ -762,25 +821,24 @@ void format_parse_error(
             writer_writef(
                 writer, 
                 "(%zu:%zu) expected ", 
-                error->expected_token.position.line, 
-                error->expected_token.position.character
+                error->variant.expected_token.position.line, 
+                error->variant.expected_token.position.character
             );
             writer_write(writer, color_magenta);
-            token_kind_debug(writer, &error->expected_token.expected);
+            token_kind_debug(writer, &error->variant.expected_token.expected);
             writer_write(writer, color_reset);
 
             writer_write(writer, ", got ");
             writer_write(writer, color_magenta);
-            token_kind_debug(writer, &error->expected_token.got);
+            token_kind_debug(writer, &error->variant.expected_token.got);
             writer_write(writer, color_reset);
 
             break;
         }
-
         case ParseErrorJoin: {
-            format_parse_error(writer, error->join.left);
+            format_parse_error(writer, error->variant.join.left);
             writer_writef(writer, " %sOR%s ", color_green, color_reset);
-            format_parse_error(writer, error->join.right);
+            format_parse_error(writer, error->variant.join.right);
             break;
         }
         default: {

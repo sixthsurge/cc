@@ -49,7 +49,7 @@ static struct CompileResult compile_variable_declaration(
             return compile_error((struct CompileError) {
                 .kind = CompileErrorIncompatibleTypes,
                 .position = ast->position,
-                .incompatible_types = {
+                .variant.incompatible_types = {
                     .first = type,
                     .second = expression_value.type,
                 },
@@ -85,8 +85,9 @@ static struct CompileResult compile_return_statement(
 
         emit_moves(
             &compiler->writer_function_body, 
-            operand_register(expression_value.operand.width, RegisterA),
+            operand_register(RegisterA),
             expression_value.operand,
+            DWord,
             RegisterA
         );
         emit_function_exit(&compiler->writer_function_body);
@@ -102,13 +103,17 @@ struct CompileResult compile_statement(
     switch (ast->kind) {
         case AstStatementExpression: {
             struct ExpressionValue expression_value_unused;
-            return compile_expression(&expression_value_unused, compiler, &ast->expression);
+            return compile_expression(
+                &expression_value_unused, 
+                compiler, 
+                &ast->variant.expression
+            );
         }
         case AstStatementVariableDeclaration: {
-            return compile_variable_declaration(compiler, &ast->variable_declaration);
+            return compile_variable_declaration(compiler, &ast->variant.variable_declaration);
         }
         case AstStatementReturn: {
-            return compile_return_statement(compiler, &ast->return_statement);
+            return compile_return_statement(compiler, &ast->variant.return_statement);
         }
         default: {
             return compile_error((struct CompileError) {

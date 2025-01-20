@@ -11,18 +11,21 @@ static bool operand_eq(struct Operand const *const left, struct Operand const *c
 
     switch (left->kind) {
     case OperandImmediate:
-        return left->immediate.value == right->immediate.value;
+        return left->variant.immediate.value == right->variant.immediate.value;
     case OperandRegister:
-        return left->int_register.reg == right->int_register.reg;
+        return left->variant.int_register.reg == right->variant.int_register.reg;
     case OperandMemory:
-        return left->memory.base_reg == right->memory.base_reg
-            && left->memory.offset == right->memory.offset;
+        return left->variant.memory.base_reg == right->variant.memory.base_reg
+            && left->variant.memory.offset == right->variant.memory.offset;
     case OperandMemoryIndexed:
-        return left->memory_indexed.base_reg == right->memory_indexed.base_reg
-            && left->memory_indexed.index_reg == right->memory_indexed.index_reg
-            && left->memory_indexed.offset == right->memory_indexed.offset
-            && left->memory_indexed.index_scale == right->memory_indexed.index_scale;
+        return left->variant.memory_indexed.base_reg == right->variant.memory_indexed.base_reg
+            && left->variant.memory_indexed.index_reg == right->variant.memory_indexed.index_reg
+            && left->variant.memory_indexed.offset == right->variant.memory_indexed.offset
+            && left->variant.memory_indexed.index_scale == right->variant.memory_indexed.index_scale;
     }
+
+    log_error("operand_eq: unknown operand kind %zu", (usize) left->kind);
+    exit(1);
 }
 
 char const *format_operand_width(
@@ -155,11 +158,15 @@ char const *format_instruction(enum Instruction instruction) {
     char const *const names[InstructionCount] = {
         "leave",
         "ret",
+        "cdq",
         "push",
         "pop",
+        "call",
+        "idiv",
         "mov",
         "add",
         "sub",
+        "imul",
     };
 
     return names[instruction];
@@ -174,8 +181,12 @@ usize instruction_expected_operand_count(enum Instruction instruction) {
     usize counts[InstructionCount] = {
         0u,
         0u,
+        0u,
         1u,
         1u,
+        1u,
+        1u,
+        2u,
         2u,
         2u,
         2u,
@@ -184,35 +195,37 @@ usize instruction_expected_operand_count(enum Instruction instruction) {
     return counts[instruction];
 }
 
-struct Operand operand_immediate(enum OperandWidth const width, i32 const value) {
+struct Operand operand_immediate(i32 const value) {
     return (struct Operand) {
         .kind = OperandImmediate,
-        .width = width,
-        .immediate = {
+        .variant.immediate = {
             .value = value,
         },
     };
 }
 
-struct Operand operand_register(enum OperandWidth const width, enum IntRegister const reg) {
+struct Operand operand_label(struct CharSlice const name) {
+    return (struct Operand) {
+        .kind = OperandLabel,
+        .variant.label = {
+            .name = name,
+        },
+    };
+}
+
+struct Operand operand_register(enum IntRegister const reg) {
     return (struct Operand) {
         .kind = OperandRegister,
-        .width = width,
-        .int_register = {
+        .variant.int_register = {
             .reg = reg,
         },
     };
 }
 
-struct Operand operand_memory(
-    enum OperandWidth const width, 
-    enum IntRegister const base_reg, 
-    i32 const offset
-) {
+struct Operand operand_memory(enum IntRegister const base_reg, i32 const offset) {
     return (struct Operand) {
         .kind = OperandMemory,
-        .width = width,
-        .memory = {
+        .variant.memory = {
             .base_reg = base_reg,
             .offset = offset,
         },
@@ -220,7 +233,6 @@ struct Operand operand_memory(
 }
 
 struct Operand operand_memory_indexed(
-    enum OperandWidth const width, 
     enum IntRegister const base_reg, 
     enum IntRegister const index_reg, 
     i32 const offset, 
@@ -228,8 +240,7 @@ struct Operand operand_memory_indexed(
 ) {
     return (struct Operand) {
         .kind = OperandMemoryIndexed,
-        .width = width,
-        .memory_indexed = {
+        .variant.memory_indexed = {
             .base_reg = base_reg,
             .index_reg = index_reg,
             .offset = offset,
@@ -238,31 +249,41 @@ struct Operand operand_memory_indexed(
     };
 }
 
-struct Operand operand_stack(enum OperandWidth const width, usize const stack_offset) {
+struct Operand operand_stack(usize const stack_offset) {
     return (struct Operand) {
         .kind = OperandMemory,
-        .width = width,
-        .memory = {
+        .variant.memory = {
             .base_reg = RegisterBP,
             .offset = -((i32) stack_offset),
         },
     };
 }
 
-void emit_operand(struct Writer *const assembly_writer, struct Operand const operand) {
+void emit_operand(
+    struct Writer *const assembly_writer, 
+    struct Operand const operand, 
+    enum OperandWidth const width
+) {
     switch (operand.kind) {
         case OperandImmediate: {
             writer_writef(
                 assembly_writer,
                 "%d",
-                operand.immediate.value
+                operand.variant.immediate.value
+            );
+            break;
+        }
+        case OperandLabel: {
+            writer_write_charslice(
+                assembly_writer,
+                operand.variant.label.name
             );
             break;
         }
         case OperandRegister: {
             writer_write(
                 assembly_writer,
-                format_register(operand.int_register.reg, operand.width)
+                format_register(operand.variant.int_register.reg, width)
             );
             break;
         }
@@ -270,9 +291,9 @@ void emit_operand(struct Writer *const assembly_writer, struct Operand const ope
             writer_writef(
                 assembly_writer,
                 "%s [%s%+d]",
-                format_operand_width(operand.width),
-                format_register(operand.memory.base_reg, QWord),
-                operand.memory.offset
+                format_operand_width(width),
+                format_register(operand.variant.memory.base_reg, QWord),
+                operand.variant.memory.offset
             );
             break;
         }
@@ -280,11 +301,11 @@ void emit_operand(struct Writer *const assembly_writer, struct Operand const ope
             writer_writef(
                 assembly_writer,
                 "%s [%s+%s*%d%+d]",
-                format_operand_width(operand.width),
-                format_register(operand.memory_indexed.base_reg, QWord),
-                format_register(operand.memory_indexed.index_reg, QWord),
-                operand.memory_indexed.index_scale,
-                operand.memory_indexed.offset
+                format_operand_width(width),
+                format_register(operand.variant.memory_indexed.base_reg, QWord),
+                format_register(operand.variant.memory_indexed.index_reg, QWord),
+                operand.variant.memory_indexed.index_scale,
+                operand.variant.memory_indexed.offset
             );
             break;
         }
@@ -294,6 +315,7 @@ void emit_operand(struct Writer *const assembly_writer, struct Operand const ope
 void emit_instruction(
     struct Writer *const assembly_writer, 
     enum Instruction const instruction,
+    enum OperandWidth const operand_width,
     usize const operand_count,
     ...
 ) {
@@ -317,7 +339,7 @@ void emit_instruction(
         struct Operand const operand = va_arg(operands, struct Operand);
 
         writer_write(assembly_writer, " ");
-        emit_operand(assembly_writer, operand);
+        emit_operand(assembly_writer, operand, operand_width);
 
         if (operand_index < operand_count - 1) {
             writer_write(assembly_writer, ",");
@@ -338,23 +360,26 @@ void emit_function_prologue(struct Writer *const assembly_writer, usize const st
     emit_instruction(
         assembly_writer, 
         InstructionPush, 
+        QWord,
         1u, 
-        operand_register(QWord, RegisterBP)
+        operand_register(RegisterBP)
     );
     emit_instruction(
         assembly_writer, 
         InstructionMov, 
+        QWord,
         2u, 
-        operand_register(QWord, RegisterBP),
-        operand_register(QWord, RegisterSP)
+        operand_register(RegisterBP),
+        operand_register(RegisterSP)
     );
     if (stack_usage > 0u) {
         emit_instruction(
             assembly_writer, 
             InstructionSub, 
+            QWord,
             2u, 
-            operand_register(QWord, RegisterSP),
-            operand_immediate(QWord, round_up_usize(stack_usage, 16u))
+            operand_register(RegisterSP),
+            operand_immediate(round_up_usize(stack_usage, 16u))
         );
     }
 }
@@ -363,11 +388,13 @@ void emit_function_exit(struct Writer *assembly_writer) {
     emit_instruction(
         assembly_writer, 
         InstructionLeave, 
+        QWord,
         0u
     );
     emit_instruction(
         assembly_writer, 
         InstructionRet, 
+        QWord,
         0u
     );
 }
@@ -376,12 +403,9 @@ void emit_moves(
     struct Writer *const assembly_writer, 
     struct Operand const dst, 
     struct Operand const src,
+    enum OperandWidth const operand_width,
     enum IntRegister const intermediate_register
 ) {
-    if (src.width != dst.width) {
-        log_error("emit_moves: non-matching operand sizes");
-        exit(1);
-    }
     if (dst.kind == OperandImmediate) {
         log_error("emit_moves: dst cannot be immediate");
         exit(1);
@@ -396,6 +420,7 @@ void emit_moves(
         emit_instruction(
             assembly_writer,
             InstructionMov,
+            operand_width,
             2u,
             dst,
             src
@@ -403,11 +428,12 @@ void emit_moves(
     } else {
         // src -> intermediate_register -> dst
         struct Operand const intermediate_location 
-            = operand_register(dst.width, intermediate_register);
+            = operand_register(intermediate_register);
 
         emit_instruction(
             assembly_writer,
             InstructionMov,
+            operand_width,
             2u,
             intermediate_location,
             src
@@ -415,6 +441,7 @@ void emit_moves(
         emit_instruction(
             assembly_writer,
             InstructionMov,
+            operand_width,
             2u,
             dst,
             intermediate_location
@@ -432,8 +459,9 @@ void emit_assign_variable(
     // TODO: support types not 4 bytes long
     emit_moves(
         assembly_writer,
-        operand_stack(DWord, assignee_stack_offset),
+        operand_stack(assignee_stack_offset),
         assigned_location,
+        DWord,
         RegisterA
     );
 }
