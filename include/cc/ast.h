@@ -1,10 +1,15 @@
 #pragma once
 
 #include "cc/common.h"
+#include "cc/integer_size.h"
 #include "cc/slice.h"
 #include "cc/token.h"
 
 struct Writer;
+
+enum AstConstantKind {
+    AstConstantInteger,
+};
 
 enum AstUnaryOpKind {
     AstUnaryOpNegation,
@@ -18,7 +23,7 @@ enum AstBinaryOpKind {
 };
 
 enum AstTypeKind {
-    AstTypeIntS32,
+    AstTypeInteger,
 };
 
 enum AstExpressionKind {
@@ -48,14 +53,24 @@ struct AstNodePosition {
     struct TokenPosition position_end;
 };
 
+struct AstIntegerType {
+    struct AstNodePosition position;
+    enum IntegerSize size;
+    bool is_signed;
+};
+
 struct AstType {
     struct AstNodePosition position;
     enum AstTypeKind kind;
+
+    union {
+        struct AstIntegerType integer_type;
+    } variant;
 };
 
 struct AstIdentifier {
-    struct AstNodePosition position;
     struct CharSlice name;
+    struct AstNodePosition position;
 };
 
 struct AstAssignee {
@@ -70,8 +85,16 @@ struct AstAssignment {
 };
 
 struct AstConstant {
+    enum AstConstantKind kind;
     struct AstNodePosition position;
-    i32 value;
+
+    union {
+        struct {
+            u64 value;
+            bool is_long;
+            bool is_signed;
+        } integer;
+    } variant;
 };
 
 struct AstCall {
@@ -192,4 +215,6 @@ void ast_debug_call(struct Writer *writer, struct AstCall const *self);
 void ast_debug_constant(struct Writer *writer, struct AstConstant const *self);
 void ast_debug_identifier(struct Writer *writer, struct AstIdentifier const *self);
 void ast_debug_type(struct Writer *writer, struct AstType const *self);
+
+char const *format_binary_op(enum AstBinaryOpKind op);
 

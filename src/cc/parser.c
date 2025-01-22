@@ -235,7 +235,7 @@ static struct ParseResult parse_identifier(
         parser_expect(parser, TokenIdentifier)
     );
 
-    out->name = parser->last_token.variant.identifier_name;
+    out->name = parser->last_token.variant.identifier.name;
     return parser_success(parser, &out->position);
 }
 
@@ -251,7 +251,11 @@ static struct ParseResult parse_constant(
         parser_expect(parser, TokenInteger)
     );
 
-    out->value = parser->last_token.variant.integer_value;
+    out->kind = AstConstantInteger;
+    out->variant.integer.value = parser->last_token.variant.integer.value;
+    out->variant.integer.is_signed = parser->last_token.variant.integer.is_signed;
+    out->variant.integer.is_long = parser->last_token.variant.integer.is_long;
+
     return parser_success(parser, &out->position);
 }
 
@@ -280,12 +284,65 @@ static struct ParseResult parse_bracketed_expression(
     return parser_success(parser, &out->position);
 }
 
-// factor = identifier | constant | bracketed_expression
-static struct ParseResult parse_factor(
+// argument_list = e | expression | argument_list `,` expression
+// call = expression `(` argument_list `)`
+static struct ParseResult parse_call(
+    struct AstCall *const out, 
+    struct Parser *const parser
+) {
+    parser_push_position(parser);
+
+    // called expression
+    PARSER_FAIL_ON(
+        parser, 
+        parse_identifier(&out->callee, parser)
+    )
+
+    // `(`
+    PARSER_FAIL_ON(
+        parser, 
+        parser_expect(parser, TokenLeftParen)
+    )
+
+    // arguments
+    struct ArenaVec arguments;
+    arenavec_init(&arguments, parser->ast_arena, sizeof (struct AstExpression));
+
+    if (!parser_accept(parser, TokenRightParen)) {
+         do {
+            struct AstExpression expression;
+            PARSER_FAIL_ON(
+                parser, 
+                parse_expression(&expression, parser)
+            )
+            arenavec_push(&arguments, &expression);
+        } while (parser_accept(parser, TokenComma));
+
+        // `)`
+        PARSER_FAIL_ON(
+            parser, 
+            parser_expect(parser, TokenRightParen)
+        )
+    }
+
+    out->arguments = arguments.data;
+    out->argument_count = arguments.len;
+
+    return parser_success(parser, &out->position);
+}
+
+// primary_expression = identifier | constant | bracketed_expression | call
+static struct ParseResult parse_primary_expression(
     struct AstExpression *const out, 
     struct Parser *const parser
 ) {
     parser_push_position(parser);
+
+    struct ParseResult const call_result = parse_call(&out->variant.call, parser);
+    if (call_result.ok) {
+        out->kind = AstExpressionCall;
+        return parser_success(parser, &out->position);
+    }
 
     struct ParseResult const identifier_result = parse_identifier(&out->variant.identifier, parser);
     if (identifier_result.ok) {
@@ -308,7 +365,8 @@ static struct ParseResult parse_factor(
         parser,
         join_parse_errors(
             parser->ast_arena, 
-            3u, 
+            4u, 
+            call_result.error,
             identifier_result.error,
             constant_result.error,
             bracketed_expression_result.error
@@ -316,13 +374,13 @@ static struct ParseResult parse_factor(
     );
 }
 
-// product = factor `*` factor | factor
-static struct ParseResult parse_product(
+// multiplicative_expression = primary_expression `*` primary_expression | primary_expression
+static struct ParseResult parse_multiplicative_expression(
     struct AstExpression *const out, 
     struct Parser *const parser
 ) {
     enum AstBinaryOpKind const ops[] = { AstBinaryOpMultiplication, AstBinaryOpDivision };
-    enum TokenKind const tokens[] = { TokenOperatorMul, TokenOperatorDiv };
+    enum TokenKind const tokens[] = { TokenAsterisk, TokenSlash };
 
     return parse_binary_operation(
         out, 
@@ -330,18 +388,18 @@ static struct ParseResult parse_product(
         2u,
         ops, 
         tokens, 
-        parse_product, 
-        parse_factor
+        parse_multiplicative_expression, 
+        parse_primary_expression
     );
 }
 
-// sum = product `+` product | product
-static struct ParseResult parse_sum(
+// additive_expression = additive_expression `+` additive_expression | additive_expression
+static struct ParseResult parse_additive_expression(
     struct AstExpression *const out, 
     struct Parser *const parser
 ) {
     enum AstBinaryOpKind const ops[] = { AstBinaryOpAddition, AstBinaryOpSubtraction };
-    enum TokenKind const tokens[] = { TokenOperatorAdd, TokenOperatorSub };
+    enum TokenKind const tokens[] = { TokenPlus, TokenMinus };
 
     return parse_binary_operation(
         out, 
@@ -349,8 +407,8 @@ static struct ParseResult parse_sum(
         2u,
         ops, 
         tokens, 
-        parse_sum, 
-        parse_product
+        parse_additive_expression, 
+        parse_multiplicative_expression
     );
 }
 
@@ -386,7 +444,7 @@ static struct ParseResult parse_assignment(
     // assignment operator
     PARSER_FAIL_ON( 
         parser,
-        parser_expect(parser, TokenOperatorAssignment)
+        parser_expect(parser, TokenEquals)
     );
 
     // assigned expression
@@ -409,58 +467,6 @@ static struct ParseResult parse_assignment(
     return parser_success(parser, &out->position);
 }
 
-// argument_list = e | expression | argument_list `,` expression
-// call = expression `(` argument_list `)`
-static struct ParseResult parse_call(
-    struct AstExpression *const out, 
-    struct Parser *const parser
-) {
-    parser_push_position(parser);
-
-    // called expression
-    struct AstIdentifier callee;
-    PARSER_FAIL_ON(
-        parser, 
-        parse_identifier(&callee, parser)
-    )
-
-    // `(`
-    PARSER_FAIL_ON(
-        parser, 
-        parser_expect(parser, TokenLeftParen)
-    )
-
-    // arguments
-    struct ArenaVec arguments;
-    arenavec_init(&arguments, parser->ast_arena, sizeof (struct AstExpression));
-
-    if (!parser_accept(parser, TokenRightParen)) {
-         do {
-            struct AstExpression expression;
-            PARSER_FAIL_ON(
-                parser, 
-                parse_expression(&expression, parser)
-            )
-            arenavec_push(&arguments, &expression);
-        } while (parser_accept(parser, TokenComma));
-
-        // `)`
-        PARSER_FAIL_ON(
-            parser, 
-            parser_expect(parser, TokenRightParen)
-        )
-    }
-
-    out->kind = AstExpressionCall;
-    out->variant.call = (struct AstCall) {
-        .callee = callee,
-        .arguments = arguments.data,
-        .argument_count = arguments.len,
-    };
-
-    return parser_success(parser, &out->position);
-}
-
 // expression = assignment | sum
 static struct ParseResult parse_expression(
     struct AstExpression *const out, 
@@ -473,13 +479,8 @@ static struct ParseResult parse_expression(
         return parser_success(parser, &out->position);
     }
 
-    struct ParseResult const call_result = parse_call(out, parser);
-    if (call_result.ok) {
-        return parser_success(parser, &out->position);
-    }
-
-    struct ParseResult const sum_result = parse_sum(out, parser);
-    if (sum_result.ok) {
+    struct ParseResult const additive_result = parse_additive_expression(out, parser);
+    if (additive_result.ok) {
         return parser_success(parser, &out->position);
     }
 
@@ -488,27 +489,110 @@ static struct ParseResult parse_expression(
         join_parse_errors(
             parser->ast_arena, 
             3u,
-            sum_result.error,
-            call_result.error,
+            additive_result.error,
+            additive_result.error,
             assignment_result.error
         )
     );
 }
 
-// type = `int`
+static struct ParseResult parse_integer_type(
+    struct AstIntegerType *const out,
+    struct Parser *const parser
+) {
+    // let it be known that C ints are cursed
+
+    parser_push_position(parser);
+
+    bool is_ok = false;
+    bool is_int = false;
+    bool is_char = false;
+    bool is_short = false;
+    bool is_long = false;
+    bool is_signed = false;
+    bool is_unsigned = false;
+
+    for (;;) {
+        if (parser_accept(parser, TokenKeywordInt)) {
+            if (is_int) {
+                is_ok = false;
+                break;
+            }
+            is_ok = true;
+            is_int = true;
+        } else if (parser_accept(parser, TokenKeywordLong)) {
+            is_ok = true;
+            is_long = true;
+        } else if (parser_accept(parser, TokenKeywordShort)) {
+            is_ok = true;
+            is_short = true;
+        } else if (parser_accept(parser, TokenKeywordChar)) {
+            is_ok = true;
+            is_char = true;
+        } else if (parser_accept(parser, TokenKeywordSigned)) {
+            is_ok = true;
+            is_signed = true;
+        } else if (parser_accept(parser, TokenKeywordUnsigned)) {
+            is_ok = true;
+            is_unsigned = true;
+        } else {
+            break;
+        }
+    }
+
+    // reject contradictions
+    if (is_char && (is_int || is_long || is_short)) {
+        is_ok = false;
+    }
+    if (is_long && is_short) {
+        is_ok = false;
+    }
+    if (is_signed && is_unsigned) {
+        is_ok = false;
+    }
+    if (!is_ok) {
+        return parser_fail(
+            parser, 
+            (struct ParseError) {
+                .kind = ParseErrorInvalidIntegerType,
+                .variant.invalid_integer_type = {
+                    .position = parser->last_token.position,
+                }
+            }
+        );
+    };
+
+    if (is_char) {
+        out->size = IntegerSize8;
+    } else if (is_short) {
+        out->size = IntegerSize16;
+    } else if (is_long) {
+        out->size = IntegerSize64;
+    } else {
+        out->size = IntegerSize32;
+    }
+    out->is_signed = is_char ? is_signed : !is_unsigned;
+
+    return parser_success(parser, &out->position);
+}
+
+// type = integer_type
 static struct ParseResult parse_type(
     struct AstType *const out, 
     struct Parser *const parser
 ) {
     parser_push_position(parser);
 
-    PARSER_FAIL_ON(
-        parser, 
-        parser_expect(parser, TokenKeywordInt)
-    )
+    // integer type
 
-    out->kind = AstTypeIntS32;
-    return parser_success(parser, &out->position);
+    struct ParseResult integer_result = parse_integer_type(&out->variant.integer_type, parser);
+
+    if (integer_result.ok) {
+        out->kind = AstTypeInteger;
+        return parser_success(parser, &out->position);
+    }
+
+    return parser_fail(parser, integer_result.error);
 }
 
 // variable_declaration = type identifier `;` | type identifier `=` expression `;`
@@ -531,7 +615,7 @@ static struct ParseResult parse_variable_declaration(
     )
 
     // assigned expression
-    if (parser_accept(parser, TokenOperatorAssignment)) {
+    if (parser_accept(parser, TokenEquals)) {
         out->has_assigned_expression = true;
 
         PARSER_FAIL_ON(
@@ -839,6 +923,15 @@ void format_parse_error(
             format_parse_error(writer, error->variant.join.left);
             writer_writef(writer, " %sOR%s ", color_green, color_reset);
             format_parse_error(writer, error->variant.join.right);
+            break;
+        }
+        case ParseErrorInvalidIntegerType: {
+            writer_writef(
+                writer, 
+                "(%zu:%zu) invalid integer type",
+                error->variant.invalid_integer_type.position.line,
+                error->variant.invalid_integer_type.position.character
+            );
             break;
         }
         default: {

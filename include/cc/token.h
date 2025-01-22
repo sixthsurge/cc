@@ -20,12 +20,12 @@ enum TokenKind {
     TokenComma,
 
     // Operators
-    TokenOperatorAssignment,
-    TokenOperatorEquality,
-    TokenOperatorAdd,
-    TokenOperatorSub,
-    TokenOperatorMul,
-    TokenOperatorDiv,
+    TokenEquals,
+    TokenDoubleEquals,
+    TokenPlus,
+    TokenMinus,
+    TokenAsterisk,
+    TokenSlash,
     
     // Keywords
     TokenKeywordReturn,
@@ -65,8 +65,14 @@ struct Token {
     struct TokenPosition position;
 
     union {
-        struct CharSlice identifier_name;
-        i32 integer_value;
+        struct {
+            struct CharSlice name;
+        } identifier;
+        struct {
+            u64 value;
+            bool is_long;
+            bool is_signed;
+        } integer;
     } variant;
 };
 

@@ -45,12 +45,12 @@ static struct CompileResult compile_function_parameters(
         struct Operand const operand_src 
             = locate_next_argument(&argument_location_context, &variable_desc.type);
 
-        emit_moves(
+        emit_assignment(
             &compiler->writer_function_body, 
             operand_stack(variable_desc.stack_offset), 
-            operand_src, 
-            DWord,
-            RegisterA
+            operand_src,
+            parameter->type,
+            parameter->type
         );
     }
 

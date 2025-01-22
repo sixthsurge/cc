@@ -59,14 +59,18 @@ void token_debug(struct Writer *writer, struct Token const *token) {
     switch (token->kind) {
         case TokenIdentifier: {
             writer_write(writer, "<identifier: ");
-            writer_write_charslice(writer, token->variant.identifier_name);
+            writer_write_charslice(writer, token->variant.identifier.name);
             writer_write(writer, ">");
             break;
         }
         case TokenInteger: {
-            writer_write(writer, "<integer: ");
-            writer_writef(writer, "%d", token->variant.integer_value);
-            writer_write(writer, ">");
+            writer_writef(
+                writer, 
+                "<integer: %lu, signed=%b, long=%b>", 
+                token->variant.integer.value,
+                token->variant.integer.is_signed,
+                token->variant.integer.is_long
+            );
             break;
         }
         default: {

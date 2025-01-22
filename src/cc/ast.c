@@ -1,6 +1,8 @@
 #include "cc/ast.h"
 
+#include "cc/log.h"
 #include "cc/writer.h"
+#include <stdlib.h>
 
 void ast_debug_root(struct Writer *writer, struct AstRoot const *self) {
     writer_write(writer, "Root(items = [");
@@ -241,7 +243,18 @@ void ast_debug_call(struct Writer *writer, struct AstCall const *self) {
 }
 
 void ast_debug_constant(struct Writer *writer, struct AstConstant const *self) {
-    writer_writef(writer, "Constant(value = %d)", self->value);
+    switch (self->kind) {
+        case AstConstantInteger: {
+            writer_writef(
+                writer, 
+                "Integer(value = %lu, signed = %b, long = %b)", 
+                self->variant.integer.value,
+                self->variant.integer.is_signed,
+                self->variant.integer.is_long
+            );
+            break;
+        }
+    }
 }
 
 void ast_debug_identifier(struct Writer *writer, struct AstIdentifier const *self) {
@@ -251,5 +264,36 @@ void ast_debug_identifier(struct Writer *writer, struct AstIdentifier const *sel
 }
 
 void ast_debug_type(struct Writer *writer, struct AstType const *self) {
-    writer_write(writer, "int");
+    switch (self->kind) {
+        case AstTypeInteger: {
+            struct AstIntegerType const *const integer_type = &self->variant.integer_type;
+            
+            if (!integer_type->is_signed) {
+                writer_write(writer, "u");
+            }
+
+            writer_writef(
+                writer, 
+                "int%s", 
+                format_integer_size(integer_type->size)
+            );
+            break;
+
+        }
+    }
+}
+char const *format_binary_op(enum AstBinaryOpKind const op) {
+    switch (op) {
+        case AstBinaryOpAddition:
+            return "+";
+        case AstBinaryOpSubtraction:
+            return "-";
+        case AstBinaryOpMultiplication:
+            return "*";
+        case AstBinaryOpDivision:
+            return "/";
+        default: 
+            log_error("format_binary_op: unknown operation %zu", (usize) op);
+            exit(1);
+    }
 }

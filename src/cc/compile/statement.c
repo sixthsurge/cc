@@ -45,6 +45,9 @@ static struct CompileResult compile_variable_declaration(
         if (!expression_result.ok) {
             return expression_result;
         }
+
+        // type checking
+
         if (!type_can_coerce(&type, &expression_value.type)) {
             return compile_error((struct CompileError) {
                 .kind = CompileErrorIncompatibleTypes,
@@ -56,11 +59,13 @@ static struct CompileResult compile_variable_declaration(
             });
         }
 
-        emit_assign_variable(
+        // emit assignment
+
+        emit_assignment(
             &compiler->writer_function_body, 
-            variable_desc.stack_offset,
-            variable_desc.type,
+            operand_stack(variable_desc.stack_offset),
             expression_value.operand,
+            variable_desc.type,
             expression_value.type
         );
     }
@@ -83,12 +88,27 @@ static struct CompileResult compile_return_statement(
             return expression_result;
         }
 
-        emit_moves(
+        // type checking
+
+        if (!type_can_coerce(compiler->function_return_type, &expression_value.type)) {
+            return compile_error((struct CompileError) {
+                .kind = CompileErrorIncompatibleTypes,
+                .position = ast->position,
+                .variant.incompatible_types = {
+                    .first = *compiler->function_return_type,
+                    .second = expression_value.type,
+                },
+            });
+        }
+
+        // emit assignment
+
+        emit_assignment(
             &compiler->writer_function_body, 
             operand_register(RegisterA),
             expression_value.operand,
-            DWord,
-            RegisterA
+            *compiler->function_return_type,
+            expression_value.type
         );
         emit_function_exit(&compiler->writer_function_body);
     }

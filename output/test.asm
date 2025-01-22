@@ -1,61 +1,32 @@
 global main
 section .data
 section .text
-g:
+f:
 	push rbp
 	mov rbp, rsp
-	sub rsp, 48
-	mov dword [rbp-4], edi
-	mov dword [rbp-8], esi
-	mov dword [rbp-12], edx
-	mov dword [rbp-16], ecx
-	mov dword [rbp-20], r8d
-	mov dword [rbp-24], r9d
-	mov eax, dword [rbp+16]
-	mov dword [rbp-28], eax
-	mov eax, dword [rbp+24]
-	mov dword [rbp-32], eax
-	mov eax, dword [rbp+32]
-	mov dword [rbp-36], eax
-	mov ebx, dword [rbp-36]
-	mov eax, dword [rbp-32]
-	add eax, ebx
-	mov ebx, eax
-	mov eax, dword [rbp-28]
-	add eax, ebx
-	mov ebx, eax
-	mov eax, dword [rbp-24]
-	add eax, ebx
-	mov ebx, eax
-	mov eax, dword [rbp-20]
-	add eax, ebx
-	mov ebx, eax
-	mov eax, dword [rbp-16]
-	add eax, ebx
-	mov ebx, eax
-	mov eax, dword [rbp-12]
-	add eax, ebx
-	mov ebx, eax
-	mov eax, dword [rbp-8]
-	add eax, ebx
-	mov ebx, eax
-	mov eax, dword [rbp-4]
-	add eax, ebx
+	sub rsp, 16
+	mov qword [rbp-8], rdi
+	mov eax, 1
+	cdqe
+	mov rbx, rax
+	mov rax, qword [rbp-8]
+	add rax, rbx
 	leave
 	ret
 main:
 	push rbp
 	mov rbp, rsp
-	push 9
-	push 8
-	push 7
-	mov r9d, 6
-	mov r8d, 5
-	mov ecx, 4
-	mov edx, 3
-	mov esi, 2
-	mov edi, 1
-	call g
-	add rsp, 24
+	sub rsp, 32
+	mov word [rbp-2], 3
+	movsx rax, word [rbp-2]
+	mov qword [rbp-16], rax
+	mov rdi, qword [rbp-16]
+	call f
+	mov qword [rbp-24], rax
+	mov rdi, qword [rbp-16]
+	call f
+	mov rbx, rax
+	mov rax, qword [rbp-24]
+	add rax, rbx
 	leave
 	ret

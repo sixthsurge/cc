@@ -59,6 +59,17 @@ void format_compile_error(struct Writer *const writer, struct CompileError const
             type_debug(writer, &error->variant.incompatible_types.second);
             break;
         }
+        case CompileErrorIncompatibleTypesWithBinaryOp: {
+            writer_write(writer, "incompatible types for operation: ");
+            type_debug(writer, &error->variant.incompatible_types_with_binary_op.first);
+            writer_writef(
+                writer, 
+                " %s ", 
+                format_binary_op(error->variant.incompatible_types_with_binary_op.op)
+            );
+            type_debug(writer, &error->variant.incompatible_types_with_binary_op.second);
+            break;
+        }
         case CompileErrorVariableRedeclaration: {
             writer_write(writer, "redeclaration of ");
             writer_write(writer, color_magenta);

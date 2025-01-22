@@ -11,6 +11,7 @@ enum CompileErrorKind {
     CompileErrorNotImplemented,
     CompileErrorUndeclaredIdentifier,
     CompileErrorIncompatibleTypes,
+    CompileErrorIncompatibleTypesWithBinaryOp,
     CompileErrorIncorrectArgumentCount,
     CompileErrorVariableRedeclaration,
     CompileErrorFunctionRedefinition,
@@ -28,6 +29,11 @@ struct CompileError {
             struct Type first;
             struct Type second;
         } incompatible_types;
+        struct {
+            enum AstBinaryOpKind op;
+            struct Type first;
+            struct Type second;
+        } incompatible_types_with_binary_op;
         struct {
             struct CharSlice function_name;
             usize expected;

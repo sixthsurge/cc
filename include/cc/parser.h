@@ -9,6 +9,7 @@ enum ParseErrorKind {
     ParseErrorUnknown,
     ParseErrorJoin,          // {ParseError} or {ParseError}
     ParseErrorExpectedToken, // expected {TokenKind}, got {TokenKind}
+    ParseErrorInvalidIntegerType,
 };
 
 struct ParseError {
@@ -24,6 +25,9 @@ struct ParseError {
             enum TokenKind expected;
             enum TokenKind got;
         } expected_token;
+        struct {
+            struct TokenPosition position;
+        } invalid_integer_type;
     } variant;
 };
 

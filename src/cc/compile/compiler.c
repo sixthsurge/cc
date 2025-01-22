@@ -8,6 +8,7 @@
 #include "cc/compile/error.h"
 #include "cc/compile/variable_table.h"
 #include "cc/log.h"
+#include "cc/type.h"
 
 void compiler_push_scope(
     struct Compiler *const self, 
@@ -45,11 +46,13 @@ struct CompileResult compiler_declare_variable(
     struct Type const type,
     struct AstNodePosition const position
 ) {
+    usize const type_size = type_size_bytes(&type);
+    usize const type_alignment = type_alignment_bytes(&type);
+
     // update stack offset
-    usize const size_bytes = type_size_bytes(&type);
-    self->stack_offset += size_bytes;
-    self->stack_offset_temporary += size_bytes;
+    self->stack_offset = round_up_usize(self->stack_offset, type_alignment) + type_size;
     self->stack_offset_max = max_usize(self->stack_offset_max, self->stack_offset);
+    self->stack_offset_temporary = self->stack_offset;
 
     // update variable table
     *variable_desc_out = (struct VariableDescription) {

@@ -3,6 +3,7 @@
 #include <ctype.h>
 #include <stdlib.h>
 
+#include "cc/log.h"
 #include "cc/slice.h"
 #include "cc/token.h"
 
@@ -27,6 +28,89 @@ static bool is_letter_or_underscore(char const c) {
 
 static bool is_letter_underscore_or_digit(char const c) {
     return is_letter_or_underscore(c) || isdigit(c);
+}
+
+static bool parse_integer_literal(
+    struct CharSlice const word,
+    u64 *const value_out,
+    bool *const is_long,
+    bool *const is_signed
+) {
+    usize char_index = 0u;
+
+    // detect base
+
+    u64 base = 10u;
+    if (word.len >= 2u && word.ptr[0] == '0') {
+        if (word.ptr[1] == 'x' || word.ptr[1] == 'X') {
+            // hexadecimal
+            base = 16u;
+            char_index += 2u;
+        } else if (word.ptr[1] == 'b' || word.ptr[1] == 'B') {
+            // binary 
+            base = 2u;
+            char_index += 2u;
+        } else {
+            // octal
+            base = 8u;
+            char_index += 1u;
+        } 
+    } 
+
+    // parse value
+
+    u64 value = 0u;
+
+    while (char_index < word.len) {
+        char const c = word.ptr[char_index];
+
+        u64 digit_value;
+        if ('0' <= c && c <= '9') {
+            // decimal digit
+            digit_value = (u64) c - (u64) '0';
+        } else if (base == 16u && 'a' <= c && c <= 'f') {
+            // lowercase hexadecimal digit
+            digit_value = (u64) c - (u64) 'a' + 10u;
+        } else if (base == 16u && 'A' <= c && c <= 'F') {
+            // uppercase hexadecimal digit
+            digit_value = (u64) c - (u64) 'A' + 10u;
+        } else {
+            break;
+        }
+
+        if (digit_value >= base) {
+            return false;
+        }
+
+        value = value * base + digit_value;
+        char_index += 1u;
+    }
+
+    *value_out = value;
+    *is_long = false;
+    *is_signed = true;
+
+    // detect unsigned suffix 
+
+    if (char_index == word.len) {
+        return true;
+    }
+    if (word.ptr[char_index] == 'u' || word.ptr[char_index] == 'U') {
+        *is_signed = false;
+        char_index += 1u;
+    }
+
+    // detect long suffix
+
+    if (char_index == word.len) {
+        return true;
+    }
+    if (word.ptr[char_index] == 'l' || word.ptr[char_index] == 'L') {
+        *is_long = true;
+        char_index += 1u;
+    }
+
+    return char_index == word.len;
 }
 
 static void lexer_init(struct Lexer *const self, char const *const source_string) {
@@ -125,28 +209,28 @@ static struct Token lexer_next_token(struct Lexer *const self) {
 
             if (c_next == '=') {
                 // double = -> equality
-                token.kind = TokenOperatorEquality;
+                token.kind = TokenDoubleEquals;
                 lexer_next_char(self);
             } else {
                 // single = -> assignment
-                token.kind = TokenOperatorAssignment;
+                token.kind = TokenEquals;
             }
             break;
         }
         case '+': {
-            token.kind = TokenOperatorAdd;
+            token.kind = TokenPlus;
             break;
         }
         case '-': {
-            token.kind = TokenOperatorSub;
+            token.kind = TokenMinus;
             break;
         }
         case '*': {
-            token.kind = TokenOperatorMul;
+            token.kind = TokenAsterisk;
             break;
         }
         case '/': {
-            token.kind = TokenOperatorDiv;
+            token.kind = TokenSlash;
             break;
         }
         default: {
@@ -155,8 +239,18 @@ static struct Token lexer_next_token(struct Lexer *const self) {
                 self->character_index -= 1;
                 struct CharSlice const word = lexer_next_word(self);
 
-                token.kind = TokenInteger;
-                token.variant.integer_value = atoi(word.ptr);
+                bool ok = parse_integer_literal(
+                    word,
+                    &token.variant.integer.value,
+                    &token.variant.integer.is_long,
+                    &token.variant.integer.is_signed
+                );
+
+                if (ok) {
+                    token.kind = TokenInteger;
+                } else {
+                    token.kind = TokenUnknown;
+                }
             } else if (is_letter_or_underscore(c)) {
                 // word
                 self->character_index -= 1;
@@ -200,7 +294,7 @@ static struct Token lexer_next_token(struct Lexer *const self) {
                     token.kind = TokenKeywordDouble;
                 } else {
                     token.kind = TokenIdentifier;
-                    token.variant.identifier_name = word;
+                    token.variant.identifier.name = word;
                 }
             } else {
                 token.kind = TokenUnknown;

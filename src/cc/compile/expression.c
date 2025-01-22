@@ -9,6 +9,16 @@
 #include "cc/log.h"
 #include "cc/type.h"
 
+static enum IntegerSize get_integer_size_for_constant(u64 value, bool is_signed) {
+    u64 const max_32 = is_signed ? INT32_MAX : UINT32_MAX;
+
+    if (value < max_32) {
+        return IntegerSize32;
+    } else {
+        return IntegerSize64;
+    }
+}
+
 static struct CompileResult compile_identifier(
     struct ExpressionValue *value_out, 
     struct Compiler *compiler, 
@@ -43,9 +53,31 @@ static struct CompileResult compile_constant(
     struct Compiler *compiler, 
     struct AstConstant const *ast
 ) {
-    value_out->operand = operand_immediate(ast->value);
-    value_out->type.kind = TypeKindIntSigned32;
-    return compile_ok();
+    switch (ast->kind) {
+        case AstConstantInteger: {
+            bool const is_signed = ast->variant.integer.is_signed;
+            enum IntegerSize const size = ast->variant.integer.is_long
+                ? IntegerSize64
+                : get_integer_size_for_constant(ast->variant.integer.value, is_signed);
+
+            value_out->operand = operand_immediate(ast->variant.integer.value);
+            value_out->type = (struct Type) {
+                .kind = TypeInteger,
+                .variant.integer_type = {
+                    .size = size,
+                    .is_signed = is_signed,
+                },
+            };
+
+            return compile_ok();
+        }
+        default: {
+            return compile_error((struct CompileError) {
+                .kind = CompileErrorNotImplemented,
+                .position = ast->position,
+            });
+        }
+    }
 }
 
 static struct CompileResult compile_assignment(
@@ -78,15 +110,26 @@ static struct CompileResult compile_assignment(
     struct ExpressionValue expression_value;
     compile_expression(&expression_value, compiler, ast->assigned_expression);
 
-    // TODO: type checking 
+    // type checking 
+
+    if (!type_can_coerce(&variable_desc.type, &expression_value.type)) {
+        return compile_error((struct CompileError) {
+            .kind = CompileErrorIncompatibleTypes,
+            .position = ast->position,
+            .variant.incompatible_types = {
+                .first = variable_desc.type,
+                .second = expression_value.type,
+            },
+        });
+    }
 
     // emit assignment 
 
-    emit_assign_variable(
+    emit_assignment(
         &compiler->writer_function_body, 
-        variable_desc.stack_offset, 
-        variable_desc.type, 
+        operand_stack(variable_desc.stack_offset), 
         expression_value.operand, 
+        variable_desc.type, 
         expression_value.type
     );
 
@@ -106,7 +149,7 @@ static bool analyze_binary_op(
     switch (op) {
         case AstBinaryOpAddition: {
             switch (left_type.kind) {
-                case TypeKindIntSigned32: { 
+                case TypeInteger: { 
                     *instruction_out = InstructionAdd;
                     return true;
                 }
@@ -117,7 +160,7 @@ static bool analyze_binary_op(
         }
         case AstBinaryOpSubtraction: {
             switch (left_type.kind) {
-                case TypeKindIntSigned32: { 
+                case TypeInteger: { 
                     *instruction_out = InstructionSub;
                     return true;
                 }
@@ -128,7 +171,7 @@ static bool analyze_binary_op(
         }
         case AstBinaryOpMultiplication: {
             switch (left_type.kind) {
-                case TypeKindIntSigned32: { 
+                case TypeInteger: { 
                     *instruction_out = InstructionIMul;
                     return true;
                 }
@@ -139,7 +182,7 @@ static bool analyze_binary_op(
         }
         case AstBinaryOpDivision: {
             switch (left_type.kind) {
-                case TypeKindIntSigned32: { 
+                case TypeInteger: { 
                     *instruction_out = InstructionIDiv;
                     return true;
                 }
